@@ -1,24 +1,22 @@
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { useAuthStore } from './src/features/auth/store/useAuthStore';
-import Navigation from './src/navigation';
+import 'react-native-gesture-handler';
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import RootNavigator from '@/src/navigation';
+import { StatusBar } from 'expo-status-bar';
+import './global.css'; // NativeWind v4 requirement
+import { Text, TouchableOpacity } from 'react-native';
 
 export default function App() {
-  const initialize = useAuthStore((s) => s.initialize);
-  const isInitialized = useAuthStore((s) => s.isInitialized);
-  const isLoading = useAuthStore((s) => s.isLoading);
-
-  useEffect(() => {
-    initialize();
-  }, []);
-
-  if (!isInitialized || isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  return <Navigation />;
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <RootNavigator />
+      <TouchableOpacity 
+        className="absolute bottom-6 right-6 bg-blue-600 w-16 h-16 rounded-full items-center justify-center shadow-lg"
+        onPress={() => navigation.navigate('CreateAuction')}
+      >
+        <Text className="text-white text-3xl font-light mb-1">+</Text>
+      </TouchableOpacity>
+    </SafeAreaProvider>
+  );
 }

@@ -1,28 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
-interface Props {
-  endTime: string; // ISO string from DB
-  serverTime: number; // server timestamp (ms)
-}
-
-export function useAuctionTimer({ endTime, serverTime }: Props) {
-  const [remainingTime, setRemainingTime] = useState(0);
+export function useAuctionTimer(endTime: string | null) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [isEnded, setIsEnded] = useState<boolean>(false);
 
   useEffect(() => {
-    const end = new Date(endTime).getTime();
+    if (!endTime) return;
 
-    // calculate offset between device and server
-    const offset = Date.now() - serverTime;
+    const calculateTimeLeft = () => {
+      const difference = new Date(endTime).getTime() - new Date().getTime();
 
-    const interval = setInterval(() => {
-      const now = Date.now() - offset;
-      const diff = end - now;
+      if (difference <= 0) {
+        setIsEnded(true);
+        setTimeLeft('Auction Ended');
+        return;
+      }
 
-      setRemainingTime(diff > 0 ? diff : 0);
-    }, 1000);
+      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
 
-    return () => clearInterval(interval);
-  }, [endTime, serverTime]);
+      setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+    };
 
-  return remainingTime;
+    // Run immediately, then every second
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(timer);
+  }, [endTime]);
+
+  return { timeLeft, isEnded };
 }

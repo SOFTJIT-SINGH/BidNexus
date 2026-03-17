@@ -13,6 +13,8 @@ interface AuctionState {
   isLoading: boolean;
 
   fetchAuctions: () => Promise<void>;
+  // Action to be called by your realtime listener
+  updateAuctionInStore: (updatedAuction: Partial<Auction> & { id: string }) => void;
 }
 
 export const useAuctionStore = create<AuctionState>((set) => ({
@@ -29,5 +31,15 @@ export const useAuctionStore = create<AuctionState>((set) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  updateAuctionInStore: (updatedAuction) => {
+    set((state) => ({
+      auctions: state.auctions.map((auction) =>
+        auction.id === updatedAuction.id
+          ? { ...auction, ...updatedAuction }
+          : auction
+      ),
+    }));
   },
 }));
