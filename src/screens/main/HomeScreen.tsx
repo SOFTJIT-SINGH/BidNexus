@@ -102,7 +102,7 @@ export default function HomeScreen() {
       {/* Futuristic Floating Action Button */}
       <TouchableOpacity 
         className="absolute bottom-6 right-6 w-16 h-16 rounded-full items-center justify-center shadow-lg shadow-cyan-500/50"
-        onPress={() => navigation.navigate('CreateAuction')}
+        onPress={() => navigation.navigate('CreateAuction')} 
         activeOpacity={0.8}
       >
         <BlurView intensity={50} tint="dark" className="absolute w-full h-full rounded-full border border-cyan-400/50" />
