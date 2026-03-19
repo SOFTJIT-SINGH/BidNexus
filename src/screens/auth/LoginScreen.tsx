@@ -22,7 +22,7 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1 bg-[#09090E]">
-      {/* Background Tech Gradients / Glowing Orbs */}
+      {/* Background Gradients */}
       <View className="absolute -top-32 -left-32 w-96 h-96 bg-cyan-600/30 rounded-full blur-[100px]" />
       <View className="absolute top-1/2 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px]" />
 
@@ -30,22 +30,18 @@ export default function LoginScreen() {
         
         <View className="mb-12">
           <Text className="text-5xl font-black text-white tracking-widest mb-2 shadow-cyan-500/50 shadow-lg">
-            NEXUS
+            BidNexus
           </Text>
           <Text className="text-cyan-400 font-medium tracking-widest uppercase text-xs">
-            AI-Driven Auction Protocol
+            Premium Live Auctions
           </Text>
         </View>
 
         {/* Glassmorphic Form Card */}
-        <BlurView 
-          intensity={30} 
-          tint="dark" 
-          className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl"
-        >
+        <View className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
           <View className="space-y-5 mb-8">
             <View>
-              <Text className="text-gray-400 text-xs uppercase tracking-wider mb-2 font-bold">Identity (Email)</Text>
+              <Text className="text-gray-400 text-xs uppercase tracking-wider mb-2 font-bold">Email Address</Text>
               <TextInput
                 className="w-full bg-black/40 border border-white/10 px-4 py-4 rounded-xl text-white text-base"
                 placeholder="Enter your email"
@@ -58,7 +54,7 @@ export default function LoginScreen() {
             </View>
 
             <View>
-              <Text className="text-gray-400 text-xs uppercase tracking-wider mb-2 font-bold">Access Key (Password)</Text>
+              <Text className="text-gray-400 text-xs uppercase tracking-wider mb-2 font-bold">Password</Text>
               <TextInput
                 className="w-full bg-black/40 border border-white/10 px-4 py-4 rounded-xl text-white text-base"
                 placeholder="••••••••"
@@ -69,6 +65,25 @@ export default function LoginScreen() {
               />
             </View>
           </View>
+
+          <View>
+              <Text className="text-gray-400 text-xs uppercase tracking-wider mb-2 font-bold">Password</Text>
+              <TextInput
+                className="w-full bg-black/40 border border-white/10 px-4 py-4 rounded-xl text-white text-base"
+                placeholder="••••••••"
+                placeholderTextColor="#6b7280"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+              {/* ADD THIS FORGOT PASSWORD LINK HERE */}
+              <TouchableOpacity 
+                className="mt-3 items-end" 
+                onPress={() => navigation.navigate('ResetPassword')}
+              >
+                <Text className="text-cyan-400 text-xs font-bold">Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
 
           <TouchableOpacity
             className="w-full overflow-hidden rounded-xl mb-4"
@@ -84,7 +99,7 @@ export default function LoginScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text className="text-white font-black tracking-widest uppercase">Initialize Session</Text>
+                <Text className="text-white font-black tracking-widest uppercase">Sign In</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -96,7 +111,7 @@ export default function LoginScreen() {
           >
             <Text className="text-gray-300 font-bold tracking-wider">Create Account</Text>
           </TouchableOpacity>
-        </BlurView>
+        </View>
 
       </SafeAreaView>
     </View>
