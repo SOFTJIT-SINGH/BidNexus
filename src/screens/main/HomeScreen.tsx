@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StatusBar, ScrollView, Modal, Animated, Dimensions, Image } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StatusBar, Modal, Animated, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 
@@ -13,6 +14,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   
   const [activeCategory, setActiveCategory] = useState('All Items');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // NEW: State to control if the filter pills are visible
+  const [showFilters, setShowFilters] = useState(true); 
+  
   const slideAnim = useRef(new Animated.Value(-width)).current;
 
   useEffect(() => {
@@ -33,37 +38,27 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     navigation.navigate('AuctionDetail', { auctionId: id });
   };
 
-  // --- FILTERING LOGIC ---
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
       if (activeCategory === 'All Items') return true;
-
       if (activeCategory === 'Ending Soon') {
-        // Less than 24 hours left
         const hoursLeft = (new Date(auction.end_time).getTime() - new Date().getTime()) / (1000 * 60 * 60);
         return hoursLeft > 0 && hoursLeft <= 24; 
       }
-
       if (activeCategory === 'High Value') {
         return Number(auction.current_price) >= 500;
       }
-
-      // Keyword matching for Tech
       if (activeCategory === 'Tech') {
         const text = `${auction.title} ${auction.description}`.toLowerCase();
-        return text.includes('tech') || text.includes('phone') || text.includes('laptop') || text.includes('pc') || text.includes('computer') || text.includes('watch') || text.includes('gaming');
+        return text.includes('tech') || text.includes('phone') || text.includes('laptop') || text.includes('pc') || text.includes('computer');
       }
-
-      // Keyword matching for Vehicles
       if (activeCategory === 'Vehicles') {
         const text = `${auction.title} ${auction.description}`.toLowerCase();
         return text.includes('car') || text.includes('vehicle') || text.includes('bike') || text.includes('motor') || text.includes('truck');
       }
-
       return true;
     });
   }, [auctions, activeCategory]);
-  // -----------------------
 
   const renderAuctionCard = ({ item }: { item: any }) => {
     const timeLeft = new Date(item.end_time).toLocaleDateString();
@@ -75,7 +70,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         activeOpacity={0.8}
       >
         <View className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-          
           {item.image_url && (
             <View className="w-full h-40 bg-black/60 border-b border-white/5">
               <Image source={{ uri: item.image_url }} className="w-full h-full opacity-70" resizeMode="cover" />
@@ -96,9 +90,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View className="flex-row justify-between items-end bg-black/40 p-4 rounded-2xl border border-white/5">
               <View>
                 <Text className="text-gray-500 text-xs uppercase tracking-widest mb-1 font-bold">Current Bid</Text>
-                <Text className="text-2xl font-black text-cyan-400">
-                  ${Number(item.current_price).toLocaleString()}
-                </Text>
+                <Text className="text-2xl font-black text-cyan-400">${Number(item.current_price).toLocaleString()}</Text>
               </View>
               <View className="items-end">
                 <Text className="text-gray-500 text-xs uppercase tracking-widest mb-1 font-bold">Ends In</Text>
@@ -106,7 +98,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
             </View>
           </View>
-
         </View>
       </TouchableOpacity>
     );
@@ -128,33 +119,62 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         <View className="px-6 py-4 flex-row justify-between items-center mt-2">
           <View className="flex-row items-center">
-            <TouchableOpacity onPress={openCommandCenter} className="mr-4 p-2 -ml-2">
-              <Text className="text-cyan-400 text-3xl font-light">≡</Text>
+            <TouchableOpacity onPress={openCommandCenter} className="mr-4 -ml-1">
+              <Ionicons name="menu" size={32} color="#22d3ee" />
             </TouchableOpacity>
             <View>
               <Text className="text-2xl font-black text-white tracking-wider">AUCTIONS</Text>
               <Text className="text-gray-500 text-xs tracking-widest uppercase mt-1">Live Market</Text>
             </View>
           </View>
+
+          {/* FIX: Wired up the onPress to toggle showFilters state! */}
+          <TouchableOpacity 
+            onPress={() => setShowFilters(!showFilters)}
+            className={`w-10 h-10 rounded-full items-center justify-center border transition-all ${
+              showFilters ? 'bg-cyan-500/20 border-cyan-400/50' : 'bg-white/5 border-white/10'
+            }`}
+          >
+            <Ionicons name="options-outline" size={20} color={showFilters ? "#22d3ee" : "#9ca3af"} />
+          </TouchableOpacity>
         </View>
 
-        <View className="mb-4">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="px-6 py-2">
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => setActiveCategory(cat)}
-                className={`mr-3 px-5 py-2 rounded-full border ${
-                  activeCategory === cat ? 'bg-cyan-500/20 border-cyan-400/50' : 'bg-white/5 border-white/10'
-                }`}
-              >
-                <Text className={`text-xs font-bold tracking-widest uppercase ${activeCategory === cat ? 'text-cyan-400' : 'text-gray-400'}`}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        {/* FIX: Conditionally render the category list based on showFilters */}
+        {showFilters && (
+          <View style={{ height: 50, marginBottom: 16 }}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={CATEGORIES}
+              keyExtractor={(item) => item}
+              contentContainerStyle={{ paddingHorizontal: 24, alignItems: 'center' }}
+              renderItem={({ item: cat }) => (
+                <TouchableOpacity
+                  onPress={() => setActiveCategory(cat)}
+                  style={{
+                    marginRight: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    backgroundColor: activeCategory === cat ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    borderColor: activeCategory === cat ? 'rgba(34, 211, 238, 0.5)' : 'rgba(255, 255, 255, 0.1)'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    letterSpacing: 1,
+                    textTransform: 'uppercase',
+                    color: activeCategory === cat ? '#22d3ee' : '#9ca3af'
+                  }}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
 
         {isLoading && auctions.length === 0 ? (
           <View className="flex-1 justify-center items-center">
@@ -162,17 +182,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         ) : (
           <FlatList
-            data={filteredAuctions} // Uses the filtered array here!
+            data={filteredAuctions} 
             keyExtractor={(item) => item.id}
             renderItem={renderAuctionCard}
-            contentContainerClassName="p-6 pt-2 pb-24"
+            contentContainerClassName="p-6 pt-0 pb-24"
             showsVerticalScrollIndicator={false}
             refreshing={isLoading}
             onRefresh={fetchAuctions}
             ListEmptyComponent={
               <View className="flex-1 justify-center items-center mt-20">
                 <View className="w-16 h-16 rounded-full bg-white/5 border border-white/10 items-center justify-center mb-4">
-                  <Text className="text-gray-500 text-2xl">∅</Text>
+                  <Ionicons name="search" size={24} color="#6b7280" />
                 </View>
                 <Text className="text-gray-500 text-sm tracking-widest uppercase font-bold text-center">
                   {activeCategory === 'All Items' ? 'No active auctions found.' : `No ${activeCategory} auctions found.`}
@@ -193,11 +213,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
       <Modal visible={isSidebarOpen} transparent animationType="fade" onRequestClose={closeCommandCenter}>
         <View className="flex-1 flex-row">
-          
-          <Animated.View 
-            style={{ transform: [{ translateX: slideAnim }], width: width * 0.75 }} 
-            className="h-full bg-[#050508] border-r border-cyan-500/30 shadow-2xl z-50 pt-16 px-6"
-          >
+          <Animated.View style={{ transform: [{ translateX: slideAnim }], width: width * 0.75 }} className="h-full bg-[#050508] border-r border-cyan-500/30 shadow-2xl z-50 pt-16 px-6">
             <View className="mb-10">
               <View className="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 items-center justify-center mb-4">
                 <Text className="text-cyan-400 text-xl font-black uppercase">{user?.email?.charAt(0) || 'U'}</Text>
@@ -227,14 +243,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
             </View>
 
-            <TouchableOpacity 
-              onPress={() => { closeCommandCenter(); signOut(); }} 
-              className="py-4 border-t border-white/10 mt-6"
-            >
+            <TouchableOpacity onPress={() => { closeCommandCenter(); signOut(); }} className="py-4 border-t border-white/10 mt-6">
               <Text className="text-red-500 text-sm font-black tracking-widest uppercase">Log Out</Text>
             </TouchableOpacity>
           </Animated.View>
-
           <TouchableOpacity activeOpacity={1} onPress={closeCommandCenter} className="flex-1 bg-black/70" />
         </View>
       </Modal>
