@@ -278,18 +278,27 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             </View>
 
             <View>
-              <View className="bg-cyan-900/10 border border-cyan-500/20 rounded-2xl p-4 mb-6">
-                <View className="flex-row items-center mb-3">
-                  <Ionicons name="hardware-chip-outline" size={16} color="#22d3ee" className="mr-2" />
-                  <Text className="text-cyan-400 text-[10px] font-black tracking-[2px] uppercase">System Status</Text>
+             <View className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 shadow-lg">
+                <View className="flex-row justify-between items-center mb-4 border-b border-white/5 pb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="wallet-outline" size={16} color="#22d3ee" className="mr-2" />
+                    <Text className="text-cyan-400 text-[10px] font-black tracking-[2px] uppercase">My Wallet</Text>
+                  </View>
+                  <TouchableOpacity>
+                    <Text className="text-cyan-500 text-[10px] font-bold uppercase tracking-wider">+ Add Funds</Text>
+                  </TouchableOpacity>
                 </View>
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500 text-xs font-bold">Network</Text>
-                  <Text className="text-green-400 text-xs font-bold">SECURE</Text>
+                
+                <View className="mb-4">
+                  <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Available Balance</Text>
+                  <Text className="text-3xl font-black text-white tracking-wide">₹24,500</Text>
                 </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-gray-500 text-xs font-bold">Latency</Text>
-                  <Text className="text-white text-xs font-bold">12ms</Text>
+                
+                <View className="flex-row justify-between pt-3 border-t border-white/5">
+                  <Text className="text-gray-400 text-xs font-bold tracking-wider">Active Bids</Text>
+                  <View className="bg-cyan-500/20 px-2 py-1 rounded-md border border-cyan-500/30">
+                    <Text className="text-cyan-400 text-[10px] font-black">3 ITEMS</Text>
+                  </View>
                 </View>
               </View>
 
