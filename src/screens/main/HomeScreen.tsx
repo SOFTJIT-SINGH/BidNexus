@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StatusBar, Modal, Animated, Dimensions, Image } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StatusBar, Modal, Animated, Dimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
@@ -14,11 +14,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   
   const [activeCategory, setActiveCategory] = useState('All Items');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  // NEW: State to control if the filter pills are visible
   const [showFilters, setShowFilters] = useState(true); 
   
   const slideAnim = useRef(new Animated.Value(-width)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchAuctions();
@@ -26,17 +25,45 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const openCommandCenter = () => {
     setIsSidebarOpen(true);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true })
+    ]).start();
   };
 
   const closeCommandCenter = () => {
-    Animated.timing(slideAnim, { toValue: -width, duration: 250, useNativeDriver: true }).start(() => setIsSidebarOpen(false));
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: -width, duration: 250, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+    ]).start(() => {
+      setIsSidebarOpen(false);
+    });
   };
 
   const handleNavigateDetail = (id: string) => {
     closeCommandCenter();
     navigation.navigate('AuctionDetail', { auctionId: id });
   };
+
+  // --- NEW: Sign Out Confirmation Warning ---
+  const handleSignOutConfirm = () => {
+    Alert.alert(
+      "Terminate Session",
+      "Are you sure you want to securely log out of BidNexus?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Log Out", 
+          style: "destructive", 
+          onPress: () => {
+            closeCommandCenter();
+            signOut();
+          } 
+        }
+      ]
+    );
+  };
+  // ------------------------------------------
 
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
@@ -90,7 +117,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View className="flex-row justify-between items-end bg-black/40 p-4 rounded-2xl border border-white/5">
               <View>
                 <Text className="text-gray-500 text-xs uppercase tracking-widest mb-1 font-bold">Current Bid</Text>
-                <Text className="text-2xl font-black text-cyan-400">${Number(item.current_price).toLocaleString()}</Text>
+                <Text className="text-2xl font-black text-cyan-400">₹{Number(item.current_price).toLocaleString()}</Text>
               </View>
               <View className="items-end">
                 <Text className="text-gray-500 text-xs uppercase tracking-widest mb-1 font-bold">Ends In</Text>
@@ -128,7 +155,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             </View>
           </View>
 
-          {/* FIX: Wired up the onPress to toggle showFilters state! */}
           <TouchableOpacity 
             onPress={() => setShowFilters(!showFilters)}
             className={`w-10 h-10 rounded-full items-center justify-center border transition-all ${
@@ -139,7 +165,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </TouchableOpacity>
         </View>
 
-        {/* FIX: Conditionally render the category list based on showFilters */}
         {showFilters && (
           <View style={{ height: 50, marginBottom: 16 }}>
             <FlatList
@@ -203,51 +228,81 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         )}
       </SafeAreaView>
 
-      <TouchableOpacity 
-        className="absolute bottom-20 right-6 w-16 h-16 rounded-full items-center justify-center shadow-lg bg-cyan-500/20 border border-cyan-400/50"
-        onPress={() => navigation.navigate('CreateAuction')}
-        activeOpacity={0.8}
-      >
-        <Text className="text-cyan-400 text-4xl font-light mb-1">+</Text>
-      </TouchableOpacity>
-
-      <Modal visible={isSidebarOpen} transparent animationType="fade" onRequestClose={closeCommandCenter}>
+      <Modal visible={isSidebarOpen} transparent animationType="none" onRequestClose={closeCommandCenter}>
         <View className="flex-1 flex-row">
-          <Animated.View style={{ transform: [{ translateX: slideAnim }], width: width * 0.75 }} className="h-full bg-[#050508] border-r border-cyan-500/30 shadow-2xl z-50 pt-16 px-6">
-            <View className="mb-10">
-              <View className="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 items-center justify-center mb-4">
-                <Text className="text-cyan-400 text-xl font-black uppercase">{user?.email?.charAt(0) || 'U'}</Text>
-              </View>
-              <Text className="text-white text-lg font-black tracking-widest uppercase">My Account</Text>
-              <Text className="text-gray-500 text-[10px] tracking-[2px] uppercase">{user?.email}</Text>
-            </View>
-
-            <View className="space-y-6 mb-10">
-              <TouchableOpacity onPress={() => { closeCommandCenter(); navigation.navigate('Profile'); }}>
-                <Text className="text-white text-sm font-bold tracking-widest uppercase">⎔ Profile & Dashboard</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { closeCommandCenter(); navigation.navigate('Profile'); }}>
-                <Text className="text-gray-400 text-sm font-bold tracking-widest uppercase">⎔ My Watchlist</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-auto">
-              <Text className="text-cyan-400 text-[10px] font-black tracking-[2px] uppercase mb-3">App Status</Text>
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-gray-500 text-xs font-bold">Connection</Text>
-                <Text className="text-green-400 text-xs font-bold">ONLINE</Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Text className="text-gray-500 text-xs font-bold">Version</Text>
-                <Text className="text-white text-xs font-bold">1.0.0</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity onPress={() => { closeCommandCenter(); signOut(); }} className="py-4 border-t border-white/10 mt-6">
-              <Text className="text-red-500 text-sm font-black tracking-widest uppercase">Log Out</Text>
-            </TouchableOpacity>
+          
+          <Animated.View style={{ opacity: fadeAnim, position: 'absolute', width: '100%', height: '100%' }}>
+            <TouchableOpacity activeOpacity={1} onPress={closeCommandCenter} className="flex-1 bg-black/80" />
           </Animated.View>
-          <TouchableOpacity activeOpacity={1} onPress={closeCommandCenter} className="flex-1 bg-black/70" />
+
+          <Animated.View 
+            style={{ transform: [{ translateX: slideAnim }], width: width * 0.75 }} 
+            className="h-full bg-[#050508] border-r border-cyan-500/30 shadow-2xl z-50 pt-16 px-6 justify-between pb-12"
+          >
+            <View>
+              <View className="mb-10 flex-row items-center border-b border-white/10 pb-6">
+                <View className="w-14 h-14 rounded-full bg-cyan-500/20 border border-cyan-400/50 items-center justify-center mr-4 shadow-lg shadow-cyan-500/20">
+                  <Text className="text-cyan-400 text-2xl font-black uppercase">{user?.email?.charAt(0) || 'U'}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white text-lg font-black tracking-widest uppercase">Operator</Text>
+                  <Text className="text-gray-400 text-[10px] tracking-[1px] uppercase" numberOfLines={1}>{user?.email}</Text>
+                </View>
+              </View>
+
+              <View className="space-y-2 mb-10">
+                <TouchableOpacity 
+                  onPress={() => { closeCommandCenter(); navigation.navigate('Profile'); }}
+                  className="flex-row items-center py-4 px-2 rounded-xl bg-white/5 border border-white/5"
+                >
+                  <Ionicons name="person-outline" size={20} color="#22d3ee" className="mr-4" />
+                  <Text className="text-white text-sm font-bold tracking-widest uppercase">Dashboard</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  onPress={() => { closeCommandCenter(); navigation.navigate('Profile'); }}
+                  className="flex-row items-center py-4 px-2 rounded-xl"
+                >
+                  <Ionicons name="bookmark-outline" size={20} color="#9ca3af" className="mr-4" />
+                  <Text className="text-gray-400 text-sm font-bold tracking-widest uppercase">Watchlist</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  onPress={() => { closeCommandCenter(); navigation.navigate('CreateAuction'); }}
+                  className="flex-row items-center py-4 px-2 rounded-xl"
+                >
+                  <Ionicons name="add-circle-outline" size={20} color="#9ca3af" className="mr-4" />
+                  <Text className="text-gray-400 text-sm font-bold tracking-widest uppercase">New Listing</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View>
+              <View className="bg-cyan-900/10 border border-cyan-500/20 rounded-2xl p-4 mb-6">
+                <View className="flex-row items-center mb-3">
+                  <Ionicons name="hardware-chip-outline" size={16} color="#22d3ee" className="mr-2" />
+                  <Text className="text-cyan-400 text-[10px] font-black tracking-[2px] uppercase">System Status</Text>
+                </View>
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-gray-500 text-xs font-bold">Network</Text>
+                  <Text className="text-green-400 text-xs font-bold">SECURE</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-500 text-xs font-bold">Latency</Text>
+                  <Text className="text-white text-xs font-bold">12ms</Text>
+                </View>
+              </View>
+
+              {/* FIX: Wired the button to the new handleSignOutConfirm function */}
+              <TouchableOpacity 
+                onPress={handleSignOutConfirm} 
+                className="flex-row items-center justify-center py-4 bg-red-500/10 border border-red-500/20 rounded-xl"
+              >
+                <Ionicons name="log-out-outline" size={20} color="#ef4444" className="mr-2" />
+                <Text className="text-red-500 text-sm font-black tracking-widest uppercase">Terminate Session</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>

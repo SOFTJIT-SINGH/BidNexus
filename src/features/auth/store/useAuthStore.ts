@@ -13,7 +13,7 @@ interface AuthState {
   cleanup: () => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
-  verifyOtp: (email: string, token: string) => Promise<void>; // <-- ADDED THIS
+  verifyOtp: (email: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -28,8 +28,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     try {
       set({ isLoading: true });
-      const { data: { session } } = await supabase.auth.getSession();
-      
+
+      // Get initial real session from Supabase
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // Set the real session state
+      set({
+        session,
+        user: session?.user ?? null,
+        isInitialized: true,
+      });
+
+      // --- TEST ACCOUNT OVERRIDE (COMMENTED OUT FOR PRODUCTION/TESTING) ---
+      /*
       if (__DEV__) {
         set({
           session: { user: { id: 'dev-123', email: 'dev@test.com' } } as any,
@@ -39,9 +52,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
         return;
       }
+      */
+      // --------------------------------------------------------------------
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-        set({ session: newSession, user: newSession?.user ?? null });
+      // Set up listener for real-time auth changes (login/logout/token refresh)
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        set({
+          session: newSession,
+          user: newSession?.user ?? null,
+        });
       });
 
       set({ authSubscription: subscription });
@@ -80,14 +101,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  // --- NEW NATIVE OTP FUNCTION ---
   verifyOtp: async (email, token) => {
     set({ isLoading: true });
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'signup', // Tells Supabase this is a new account verification
+        type: 'signup',
       });
       if (error) throw error;
     } finally {

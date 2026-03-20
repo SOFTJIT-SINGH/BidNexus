@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { ActivityIndicator, View, Platform } from 'react-native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
@@ -19,35 +19,94 @@ import ResetPasswordScreen from '@/src/screens/auth/ResetPasswordScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// FIX 1: Custom Dark Theme to prevent white flashes during screen transitions
+const NexusDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: '#09090E', 
+  },
+};
+
+// Dummy component for our central action button
+const DummyScreen = () => null;
+
 function MainTabs() {
   return (
     <Tab.Navigator 
       screenOptions={({ route }) => ({ 
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#050508', // Deep tech black
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(6, 182, 212, 0.2)', // Cyan border
-          height: 60,
-          paddingBottom: 10,
-          paddingTop: 10,
-        },
-        tabBarActiveTintColor: '#06b6d4', // Cyan active
-        tabBarInactiveTintColor: '#4b5563', // Gray inactive
         tabBarShowLabel: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName: any;
-          if (route.name === 'Auctions') {
-            iconName = 'flash'; // Lightning bolt for live market
-          } else if (route.name === 'Profile') {
-            iconName = 'person'; // User icon for profile
-          }
-          return <Ionicons name={iconName} size={size + 4} color={color} />;
+        tabBarHideOnKeyboard: true, // Keeps it out of the way when typing
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: Platform.OS === 'ios' ? 24 : 16,
+          left: 20,
+          right: 20,
+          backgroundColor: '#050508', 
+          borderTopWidth: 0,
+          height: 65,
+          borderRadius: 35,
+          borderColor: 'rgba(6, 182, 212, 0.3)',
+          borderWidth: 1,
+          elevation: 10,
+          shadowColor: '#06b6d4',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
         },
+        tabBarActiveTintColor: '#06b6d4',
+        tabBarInactiveTintColor: '#4b5563',
       })}
     >
-      <Tab.Screen name="Auctions" component={HomeScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Auctions" 
+        component={HomeScreen} 
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'flash' : 'flash-outline'} size={24} color={color} />
+          )
+        }}
+      />
+
+      {/* FIX 2: Central Floating Action Button disguised as a Tab */}
+      <Tab.Screen 
+        name="CreateSpacer" 
+        component={DummyScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault(); // Stop normal tab routing
+            navigation.navigate('CreateAuction'); // Trigger the Modal instead!
+          },
+        })}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <View style={{
+              width: 56, 
+              height: 56, 
+              borderRadius: 28, 
+              backgroundColor: 'rgba(6, 182, 212, 0.15)',
+              borderWidth: 1, 
+              borderColor: '#06b6d4', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              marginBottom: 20, // Pushes it up out of the pill
+            }}>
+              <Ionicons name="add" size={32} color="#06b6d4" />
+            </View>
+          ),
+        }}
+      />
+
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          )
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -62,14 +121,15 @@ export default function RootNavigator() {
 
   if (!isInitialized) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#0000ff" />
+      // FIX 3: Dark Mode Loading Screen
+      <View className="flex-1 items-center justify-center bg-[#09090E]">
+        <ActivityIndicator size="large" color="#06b6d4" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={NexusDarkTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           // Authenticated App
