@@ -296,18 +296,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             className="z-50 h-full justify-between border-r border-cyan-500/30 bg-[#050508] px-6 pb-12 pt-16 shadow-2xl">
             <View>
               <View className="mb-10 flex-row items-center border-b border-white/10 pb-6">
-                <View className="mr-4 h-14 w-14 items-center justify-center rounded-full border border-cyan-400/50 bg-cyan-500/20 shadow-lg shadow-cyan-500/20">
-                  <Text className="text-2xl font-black uppercase text-cyan-400">
-                    {user?.email?.charAt(0) || 'U'}
+                <View className="w-14 h-14 rounded-full bg-cyan-500/20 border border-cyan-400/50 items-center justify-center mr-4 shadow-lg shadow-cyan-500/20">
+                  {/* Gets the first letter of their first name */}
+                  <Text className="text-cyan-400 text-2xl font-black uppercase">
+                    {user?.user_metadata?.first_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                   </Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-lg font-black uppercase tracking-widest text-white">
-                    Operator
+                  {/* Displays their actual First Name */}
+                  <Text className="text-white text-lg font-black tracking-widest uppercase">
+                    {user?.user_metadata?.first_name || 'Operator'}
                   </Text>
-                  <Text
-                    className="text-[10px] uppercase tracking-[1px] text-gray-400"
-                    numberOfLines={1}>
+                  <Text className="text-gray-400 text-[10px] tracking-[1px] uppercase" numberOfLines={1}>
                     {user?.email}
                   </Text>
                 </View>
