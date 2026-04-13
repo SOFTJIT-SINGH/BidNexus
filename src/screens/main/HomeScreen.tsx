@@ -17,14 +17,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 
-const CATEGORIES = ['All Items', 'Ending Soon', 'High Value', 'Tech', 'Vehicles'];
+const CATEGORIES = ['All', 'Ending Soon', 'High Value', 'Tech', 'Vehicles'];
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const { auctions, isLoading, fetchAuctions } = useAuctionStore();
   const { user, signOut } = useAuthStore();
 
-  const [activeCategory, setActiveCategory] = useState('All Items');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
 
@@ -35,7 +35,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     fetchAuctions();
   }, []);
 
-  const openCommandCenter = () => {
+  const openMenu = () => {
     setIsSidebarOpen(true);
     Animated.parallel([
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20 }),
@@ -43,7 +43,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ]).start();
   };
 
-  const closeCommandCenter = () => {
+  const closeMenu = () => {
     Animated.parallel([
       Animated.timing(slideAnim, { toValue: -width, duration: 250, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
@@ -53,28 +53,27 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   };
 
   const handleNavigateDetail = (id: string) => {
-    closeCommandCenter();
+    closeMenu();
     navigation.navigate('AuctionDetail', { auctionId: id });
   };
 
-  const handleSignOutConfirm = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out of BidNexus?', [
+  const handleLogOut = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Log Out',
         style: 'destructive',
         onPress: () => {
-          closeCommandCenter();
+          closeMenu();
           signOut();
         },
       },
     ]);
   };
-  // ------------------------------------------
 
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
-      if (activeCategory === 'All Items') return true;
+      if (activeCategory === 'All') return true;
       if (activeCategory === 'Ending Soon') {
         const hoursLeft =
           (new Date(auction.end_time).getTime() - new Date().getTime()) / (1000 * 60 * 60);
@@ -107,54 +106,82 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     });
   }, [auctions, activeCategory]);
 
+  const getTimeRemaining = (endTime: string) => {
+    const diff = new Date(endTime).getTime() - new Date().getTime();
+    if (diff <= 0) return 'Ended';
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    if (days > 0) return `${days}d ${hours}h left`;
+    const minutes = Math.floor((diff / 1000 / 60) % 60);
+    return `${hours}h ${minutes}m left`;
+  };
+
   const renderAuctionCard = ({ item }: { item: any }) => {
-    const timeLeft = new Date(item.end_time).toLocaleDateString();
+    const timeRemaining = getTimeRemaining(item.end_time);
+    const isEnded = timeRemaining === 'Ended';
+    const isEndingSoon = !isEnded && (new Date(item.end_time).getTime() - new Date().getTime()) / (1000 * 60 * 60) <= 24;
 
     return (
       <TouchableOpacity
-        className="mb-6 shadow-2xl shadow-black/50"
+        className="mb-4"
         onPress={() => handleNavigateDetail(item.id)}
         activeOpacity={0.8}>
-        <View className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
+        <View className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13131a]">
           {item.image_url && (
-            <View className="h-40 w-full border-b border-white/5 bg-black/60">
+            <View className="h-44 w-full bg-black/40">
               <Image
                 source={{ uri: item.image_url }}
-                className="h-full w-full opacity-70"
+                className="h-full w-full"
                 resizeMode="cover"
+                style={{ opacity: 0.85 }}
               />
+              {/* Time badge on image */}
+              <View className="absolute top-3 right-3 flex-row items-center bg-black/70 px-3 py-1.5 rounded-full border border-white/10">
+                <Ionicons name="time-outline" size={12} color={isEndingSoon ? '#f87171' : '#9ca3af'} />
+                <Text className={`text-[11px] font-bold ml-1.5 ${isEndingSoon ? 'text-red-400' : 'text-gray-300'}`}>
+                  {timeRemaining}
+                </Text>
+              </View>
             </View>
           )}
 
-          <View className="p-5">
+          <View className="p-4">
             <View className="mb-3 flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="mr-2 h-2 w-2 animate-pulse rounded-full bg-cyan-400 shadow-sm shadow-cyan-400" />
-                <Text className="text-xs font-bold uppercase tracking-widest text-cyan-400">
-                  Active
+                <View className={`mr-2 h-1.5 w-1.5 rounded-full ${isEnded ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                <Text className={`text-[11px] font-semibold ${isEnded ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {isEnded ? 'Ended' : 'Live'}
                 </Text>
               </View>
-              <Text className="text-[10px] font-bold uppercase tracking-[2px] text-gray-600">
-                Item: {item.id.substring(0, 8)}
-              </Text>
+              {item.category && (
+                <View className="bg-white/[0.06] px-2.5 py-1 rounded-full">
+                  <Text className="text-[10px] font-bold text-gray-400">{item.category}</Text>
+                </View>
+              )}
             </View>
 
-            <Text className="mb-4 text-xl font-bold text-white">{item.title}</Text>
+            <Text className="mb-3 text-lg font-bold text-white">{item.title}</Text>
 
-            <View className="flex-row items-end justify-between rounded-2xl border border-white/5 bg-black/40 p-4">
-              <View>
-                <Text className="mb-1 text-xs font-bold uppercase tracking-widest text-gray-500">
-                  Current Offer
+            {!item.image_url && (
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="time-outline" size={12} color={isEndingSoon ? '#f87171' : '#6b7280'} />
+                <Text className={`text-[11px] ml-1.5 ${isEndingSoon ? 'text-red-400' : 'text-gray-500'}`}>
+                  {timeRemaining}
                 </Text>
-                <Text className="text-2xl font-black text-cyan-400">
+              </View>
+            )}
+
+            <View className="flex-row items-end justify-between rounded-xl border border-white/[0.04] bg-black/30 p-3.5">
+              <View>
+                <Text className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Current Price
+                </Text>
+                <Text className="text-xl font-black text-cyan-400">
                   ₹{Number(item.current_price).toLocaleString()}
                 </Text>
               </View>
-              <View className="items-end">
-                <Text className="mb-1 text-xs font-bold uppercase tracking-widest text-gray-500">
-                  Ends In
-                </Text>
-                <Text className="font-medium text-gray-300">{timeLeft}</Text>
+              <View className="bg-cyan-500/10 border border-cyan-500/20 px-3 py-2 rounded-xl">
+                <Text className="text-cyan-400 text-[11px] font-bold">Place Bid →</Text>
               </View>
             </View>
           </View>
@@ -163,79 +190,71 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     );
   };
 
+  const firstName = user?.user_metadata?.first_name || 'there';
+
   return (
     <View className="flex-1 bg-[#09090E]">
       <StatusBar barStyle="light-content" backgroundColor="#09090E" />
-      <View className="absolute right-0 top-0 h-96 w-full rounded-b-full bg-[#1e3a8a] opacity-20" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-row items-center border-b border-cyan-500/20 bg-cyan-900/20 px-6 py-2">
-          <Text className="mr-3 text-[10px] font-black uppercase tracking-[3px] text-cyan-400">
-            Info
-          </Text>
-          <Text className="text-xs tracking-wider text-cyan-100/70" numberOfLines={1}>
-            Welcome to BidNexus. Items are updating in real-time.
-          </Text>
-        </View>
-
-        <View className="mt-2 flex-row items-center justify-between px-6 py-4">
+        {/* Top Header */}
+        <View className="flex-row items-center justify-between px-5 py-3">
           <View className="flex-row items-center">
-            <TouchableOpacity onPress={openCommandCenter} className="-ml-1 mr-4">
-              <Ionicons name="menu" size={32} color="#22d3ee" />
+            <TouchableOpacity onPress={openMenu} className="mr-3">
+              <View className="w-10 h-10 rounded-full bg-white/[0.05] border border-white/[0.06] items-center justify-center">
+                <Ionicons name="menu" size={22} color="#22d3ee" />
+              </View>
             </TouchableOpacity>
             <View>
-              <Text className="text-2xl font-black tracking-wider text-white">MARKETPLACE</Text>
-              <Text className="mt-1 text-xs uppercase tracking-widest text-gray-500">
-                Browse Items
-              </Text>
+              <Text className="text-[13px] text-gray-400">Hi, {firstName} 👋</Text>
+              <Text className="text-lg font-black text-white">Explore Auctions</Text>
             </View>
           </View>
 
           <TouchableOpacity
             onPress={() => setShowFilters(!showFilters)}
-            className={`h-10 w-10 items-center justify-center rounded-full border transition-all ${
-              showFilters ? 'border-cyan-400/50 bg-cyan-500/20' : 'border-white/10 bg-white/5'
+            className={`h-10 w-10 items-center justify-center rounded-full border ${
+              showFilters ? 'border-cyan-400/30 bg-cyan-500/10' : 'border-white/[0.06] bg-white/[0.04]'
             }`}>
             <Ionicons
               name="options-outline"
-              size={20}
+              size={18}
               color={showFilters ? '#22d3ee' : '#9ca3af'}
             />
           </TouchableOpacity>
         </View>
 
+        {/* Category Filters */}
         {showFilters && (
-          <View style={{ height: 50, marginBottom: 16 }}>
+          <View style={{ height: 48, marginBottom: 8 }}>
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
               data={CATEGORIES}
               keyExtractor={(item) => item}
-              contentContainerStyle={{ paddingHorizontal: 24, alignItems: 'center' }}
+              contentContainerStyle={{ paddingHorizontal: 20, alignItems: 'center' }}
               renderItem={({ item: cat }) => (
                 <TouchableOpacity
                   onPress={() => setActiveCategory(cat)}
                   style={{
-                    marginRight: 12,
+                    marginRight: 8,
                     paddingHorizontal: 16,
                     paddingVertical: 8,
                     borderRadius: 20,
                     borderWidth: 1,
                     backgroundColor:
                       activeCategory === cat
-                        ? 'rgba(6, 182, 212, 0.2)'
-                        : 'rgba(255, 255, 255, 0.05)',
+                        ? 'rgba(6, 182, 212, 0.12)'
+                        : 'rgba(255, 255, 255, 0.03)',
                     borderColor:
                       activeCategory === cat
-                        ? 'rgba(34, 211, 238, 0.5)'
-                        : 'rgba(255, 255, 255, 0.1)',
+                        ? 'rgba(34, 211, 238, 0.3)'
+                        : 'rgba(255, 255, 255, 0.06)',
                   }}>
                   <Text
                     style={{
                       fontSize: 12,
-                      fontWeight: 'bold',
-                      letterSpacing: 1,
-                      textTransform: 'uppercase',
+                      fontWeight: '600',
                       color: activeCategory === cat ? '#22d3ee' : '#9ca3af',
                     }}>
                     {cat}
@@ -246,28 +265,33 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         )}
 
+        {/* Auction List */}
         {isLoading && auctions.length === 0 ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#06b6d4" />
+            <Text className="text-gray-500 text-xs mt-3">Loading auctions...</Text>
           </View>
         ) : (
           <FlatList
             data={filteredAuctions}
             keyExtractor={(item) => item.id}
             renderItem={renderAuctionCard}
-            contentContainerClassName="p-6 pt-0 pb-24"
+            contentContainerClassName="px-5 pb-24"
             showsVerticalScrollIndicator={false}
             refreshing={isLoading}
             onRefresh={fetchAuctions}
             ListEmptyComponent={
               <View className="mt-20 flex-1 items-center justify-center">
-                <View className="mb-4 h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06]">
                   <Ionicons name="search" size={24} color="#6b7280" />
                 </View>
-                <Text className="text-center text-sm font-bold uppercase tracking-widest text-gray-500">
-                  {activeCategory === 'All Items'
-                    ? 'No items found.'
-                    : `No ${activeCategory} items found.`}
+                <Text className="text-gray-400 text-sm font-semibold text-center mb-1">
+                  No items found
+                </Text>
+                <Text className="text-gray-600 text-xs text-center">
+                  {activeCategory === 'All'
+                    ? 'There are no auctions right now. Pull down to refresh.'
+                    : `No "${activeCategory}" items available.`}
                 </Text>
               </View>
             }
@@ -275,126 +299,76 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         )}
       </SafeAreaView>
 
+      {/* Side Menu */}
       <Modal
         visible={isSidebarOpen}
         transparent
         animationType="none"
-        onRequestClose={closeCommandCenter}>
+        onRequestClose={closeMenu}>
         <View className="flex-1 flex-row">
           <Animated.View
             style={{ opacity: fadeAnim, position: 'absolute', width: '100%', height: '100%' }}>
             <TouchableOpacity
               activeOpacity={1}
-              onPress={closeCommandCenter}
+              onPress={closeMenu}
               className="flex-1 bg-black/80"
             />
           </Animated.View>
 
           <Animated.View
-            style={{ transform: [{ translateX: slideAnim }], width: width * 0.75 }}
-            className="z-50 h-full justify-between border-r border-cyan-500/30 bg-[#050508] px-6 pb-12 pt-16 shadow-2xl">
+            style={{ transform: [{ translateX: slideAnim }], width: width * 0.78 }}
+            className="z-50 h-full justify-between border-r border-white/[0.06] bg-[#0a0a10] px-6 pb-12 pt-16">
             <View>
-              <View className="mb-10 flex-row items-center border-b border-white/10 pb-6">
-                <View className="w-14 h-14 rounded-full bg-cyan-500/20 border border-cyan-400/50 items-center justify-center mr-4 shadow-lg shadow-cyan-500/20">
-                  {/* Gets the first letter of their first name */}
-                  <Text className="text-cyan-400 text-2xl font-black uppercase">
-                    {user?.user_metadata?.first_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                  </Text>
-                </View>
-                <View className="flex-1">
-                  {/* Displays their actual First Name */}
-                  <Text className="text-white text-lg font-black tracking-widest uppercase">
-                    {user?.user_metadata?.first_name || 'User'}
-                  </Text>
-                  <Text className="text-gray-400 text-[10px] tracking-[1px] uppercase" numberOfLines={1}>
-                    {user?.email}
-                  </Text>
+              {/* User Section */}
+              <View className="mb-8 pb-6 border-b border-white/[0.06]">
+                <View className="flex-row items-center">
+                  <View className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-400/20 items-center justify-center mr-4">
+                    <Text className="text-cyan-400 text-xl font-black">
+                      {user?.user_metadata?.first_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-white text-lg font-bold">
+                      {user?.user_metadata?.first_name || 'User'}
+                    </Text>
+                    <Text className="text-gray-500 text-[11px]" numberOfLines={1}>
+                      {user?.email}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              <View className="mb-10 space-y-2">
-                <TouchableOpacity
-                  onPress={() => {
-                    closeCommandCenter();
-                    navigation.navigate('Profile');
-                  }}
-                  className="flex-row items-center rounded-xl border border-white/5 bg-white/5 px-2 py-4">
-                  <Ionicons name="person-outline" size={20} color="#22d3ee" className="mr-4" />
-                  <Text className="text-sm font-bold uppercase tracking-widest text-white">
-                    My Profile
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    closeCommandCenter();
-                    navigation.navigate('Profile');
-                  }}
-                  className="flex-row items-center rounded-xl px-2 py-4">
-                  <Ionicons name="bookmark-outline" size={20} color="#9ca3af" className="mr-4" />
-                  <Text className="text-sm font-bold uppercase tracking-widest text-gray-400">
-                    Saved Items
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    closeCommandCenter();
-                    navigation.navigate('CreateAuction');
-                  }}
-                  className="flex-row items-center rounded-xl px-2 py-4">
-                  <Ionicons name="add-circle-outline" size={20} color="#9ca3af" className="mr-4" />
-                  <Text className="text-sm font-bold uppercase tracking-widest text-gray-400">
-                    New Listing
-                  </Text>
-                </TouchableOpacity>
+              {/* Menu Items */}
+              <View className="space-y-1">
+                {[
+                  { icon: 'home-outline', label: 'Home', onPress: () => { closeMenu(); } },
+                  { icon: 'person-outline', label: 'My Profile', onPress: () => { closeMenu(); navigation.navigate('Profile'); } },
+                  { icon: 'heart-outline', label: 'Saved Items', onPress: () => { closeMenu(); navigation.navigate('Profile'); } },
+                  { icon: 'add-circle-outline', label: 'Sell Something', onPress: () => { closeMenu(); navigation.navigate('CreateAuction'); } },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.label}
+                    onPress={item.onPress}
+                    className="flex-row items-center rounded-xl px-3 py-4"
+                    activeOpacity={0.6}
+                  >
+                    <View className="w-9 h-9 rounded-full bg-white/[0.04] items-center justify-center mr-3">
+                      <Ionicons name={item.icon as any} size={18} color="#9ca3af" />
+                    </View>
+                    <Text className="text-gray-300 text-sm font-semibold">{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
 
+            {/* Bottom Actions */}
             <View>
-              {/* Wallet card  */}
-              {/* <View className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg"> */}
-                {/* <View className="flex-row justify-between items-center mb-4 border-b border-white/5 pb-3">
-                  <View className="flex-row items-center">
-                    <Ionicons name="wallet-outline" size={16} color="#22d3ee" className="mr-2" />
-                    <Text className="text-cyan-400 text-[10px] font-black tracking-[2px] uppercase">My Wallet</Text>
-                  </View>
-                  <TouchableOpacity>
-                    <Text className="text-cyan-500 text-[10px] font-bold uppercase tracking-wider">+ Add Funds</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View className="mb-4">
-                  <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Available Balance</Text>
-                  <Text className="text-3xl font-black text-white tracking-wide">₹24,500</Text>
-                </View>
-                
-                <View className="flex-row justify-between pt-3 border-t border-white/5">
-                  <Text className="text-gray-400 text-xs font-bold tracking-wider">Active Bids</Text>
-                  <View className="bg-cyan-500/20 px-2 py-1 rounded-md border border-cyan-500/30">
-                    <Text className="text-cyan-400 text-[10px] font-black">3 ITEMS</Text>
-                  </View>
-                </View> */}
-                {/* <TouchableOpacity
-                  onPress={() =>
-                    Alert.alert(
-                      'Academic Demo Mode',
-                      'Payment gateway integration is simulated for this project. Virtual bidding funds are automatically allocated to all operator accounts.'
-                    )
-                  }>
-                  <Text className="text-[10px] font-bold uppercase tracking-wider text-cyan-500">
-                    + Add Funds
-                  </Text>
-                </TouchableOpacity> */}
-              {/* </View> */}
-
               <TouchableOpacity
-                onPress={handleSignOutConfirm}
-                className="flex-row items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 py-4">
-                <Ionicons name="log-out-outline" size={20} color="#ef4444" className="mr-2" />
-                <Text className="text-sm font-black uppercase tracking-widest text-red-500">
-                  Log Out
-                </Text>
+                onPress={handleLogOut}
+                className="flex-row items-center justify-center rounded-xl border border-red-500/15 bg-red-500/[0.06] py-4"
+                activeOpacity={0.7}>
+                <Ionicons name="log-out-outline" size={18} color="#f87171" />
+                <Text className="text-red-400 font-bold text-sm ml-2">Log Out</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

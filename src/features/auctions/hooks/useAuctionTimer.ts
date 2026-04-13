@@ -12,15 +12,22 @@ export function useAuctionTimer(endTime: string | null) {
 
       if (difference <= 0) {
         setIsEnded(true);
-        setTimeLeft('Auction Ended');
+        setTimeLeft('Ended');
         return;
       }
 
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
       const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
       const minutes = Math.floor((difference / 1000 / 60) % 60);
       const seconds = Math.floor((difference / 1000) % 60);
 
-      setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      } else {
+        setTimeLeft(`${minutes}m ${seconds}s`);
+      }
     };
 
     // Run immediately, then every second

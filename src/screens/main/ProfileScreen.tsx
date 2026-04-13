@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StatusBar, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StatusBar, FlatList, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/src/services/supabase/supabase';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -9,15 +10,15 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
   const navigation = useNavigation<any>();
-  const isFocused = useIsFocused(); // To refresh data when user returns to this tab
+  const isFocused = useIsFocused();
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'bids' | 'watchlist' | 'listings'>('bids');
+  const [activeTab, setActiveTab] = useState<'bids' | 'saved' | 'my_items'>('bids');
   
   const [myBids, setMyBids] = useState<any[]>([]);
   const [myListings, setMyListings] = useState<any[]>([]);
   const [myWatchlist, setMyWatchlist] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalBids: 0 });
+  const [stats, setStats] = useState({ totalBids: 0, totalWon: 0 });
 
   useEffect(() => { 
     if (isFocused) fetchDashboardData(); 
@@ -28,9 +29,9 @@ export default function ProfileScreen() {
       setLoading(true);
       
       const { count } = await supabase.from('bids').select('*', { count: 'exact', head: true }).eq('user_id', user?.id);
-      setStats({ totalBids: count || 0 });
+      setStats({ totalBids: count || 0, totalWon: 0 });
 
-      // 1. Fetch Bids
+      // 1. Fetch My Bids
       const { data: bidsData } = await supabase
         .from('bids')
         .select(`amount, created_at, auctions (id, title, current_price, end_time)`)
@@ -39,7 +40,7 @@ export default function ProfileScreen() {
         .limit(20);
       if (bidsData) setMyBids(bidsData);
 
-      // 2. Fetch Listings
+      // 2. Fetch My Listings
       const { data: listingsData } = await supabase
         .from('auctions')
         .select('*')
@@ -47,7 +48,7 @@ export default function ProfileScreen() {
         .order('created_at', { ascending: false });
       if (listingsData) setMyListings(listingsData);
 
-      // 3. Fetch Watchlist
+      // 3. Fetch Saved Items
       const { data: watchlistData } = await supabase
         .from('watchlist')
         .select(`id, auctions (id, title, current_price, end_time)`)
@@ -56,16 +57,16 @@ export default function ProfileScreen() {
       if (watchlistData) setMyWatchlist(watchlistData);
 
     } catch (error: any) {
-      console.error('Error Syncing Data', error.message);
+      console.error('Error loading profile data', error.message);
     } finally { 
       setLoading(false); 
     }
   };
 
-  const handleSignOutConfirm = () => {
+  const handleLogOut = () => {
     Alert.alert(
-      "Terminate Session",
-      "Are you sure you want to log out of BidNexus?",
+      "Log Out",
+      "Are you sure you want to log out?",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Log Out", style: "destructive", onPress: signOut }
@@ -73,9 +74,8 @@ export default function ProfileScreen() {
     );
   };
 
-  const renderAuctionItem = ({ item, type }: { item: any, type: string }) => {
-    // Standardize data access since the join structure differs slightly between bids and watchlist
-    const auctionData = type === 'listings' ? item : item.auctions;
+  const renderItem = ({ item, type }: { item: any, type: string }) => {
+    const auctionData = type === 'my_items' ? item : item.auctions;
     if (!auctionData) return null;
 
     const isEnded = new Date(auctionData.end_time) < new Date();
@@ -83,27 +83,36 @@ export default function ProfileScreen() {
     return (
       <TouchableOpacity 
         onPress={() => navigation.navigate('AuctionDetail', { auctionId: auctionData.id })}
-        className="bg-white/5 border border-white/10 p-4 rounded-2xl mb-3 flex-row justify-between items-center"
+        className="bg-[#13131a] border border-white/[0.06] p-4 rounded-2xl mb-3"
+        activeOpacity={0.7}
       >
-        <View className="flex-1 pr-4">
-          <Text className="text-white font-bold mb-1" numberOfLines={1}>{auctionData.title}</Text>
-          
-          {type === 'bids' ? (
-            <Text className="text-gray-500 text-[10px] tracking-widest uppercase">Offered on {new Date(item.created_at).toLocaleDateString()}</Text>
-          ) : (
-            <Text className={`text-[10px] font-bold uppercase tracking-widest ${isEnded ? 'text-red-400' : 'text-green-400'}`}>
-              {isEnded ? 'Listing Ended' : 'Live Item'}
-            </Text>
-          )}
-        </View>
+        <View className="flex-row justify-between items-center">
+          <View className="flex-1 pr-4">
+            <Text className="text-white font-bold text-[15px] mb-1.5" numberOfLines={1}>{auctionData.title}</Text>
+            
+            {type === 'bids' ? (
+              <View className="flex-row items-center">
+                <Ionicons name="time-outline" size={12} color="#6b7280" />
+                <Text className="text-gray-500 text-[11px] ml-1">Bid placed {new Date(item.created_at).toLocaleDateString()}</Text>
+              </View>
+            ) : (
+              <View className="flex-row items-center">
+                <View className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isEnded ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                <Text className={`text-[11px] font-semibold ${isEnded ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {isEnded ? 'Ended' : 'Live Now'}
+                </Text>
+              </View>
+            )}
+          </View>
 
-        <View className="items-end">
-          <Text className="text-gray-400 text-[9px] uppercase tracking-widest mb-1">
-            {type === 'bids' ? 'Your Offer' : 'Current Value'}
-          </Text>
-          <Text className="text-cyan-400 font-black text-lg">
-            ${type === 'bids' ? item.amount : auctionData.current_price}
-          </Text>
+          <View className="items-end">
+            <Text className="text-gray-500 text-[10px] uppercase tracking-wider mb-0.5">
+              {type === 'bids' ? 'Your Bid' : 'Price'}
+            </Text>
+            <Text className="text-cyan-400 font-black text-lg">
+              ₹{Number(type === 'bids' ? item.amount : auctionData.current_price).toLocaleString()}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -111,7 +120,7 @@ export default function ProfileScreen() {
 
   const getActiveData = () => {
     if (activeTab === 'bids') return myBids;
-    if (activeTab === 'watchlist') return myWatchlist;
+    if (activeTab === 'saved') return myWatchlist;
     return myListings;
   };
 
@@ -119,101 +128,190 @@ export default function ProfileScreen() {
     navigation.navigate('EditProfile');
   };
 
-  const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() || 'No Name Provided';
+  const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() || 'No Name Set';
+  const initials = `${user?.user_metadata?.first_name?.charAt(0) || ''}${user?.user_metadata?.last_name?.charAt(0) || ''}`.toUpperCase() || 'U';
+  
+  // Member since
+  const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently';
+
+  const tabs = [
+    { key: 'bids', label: 'My Bids', icon: 'pricetag-outline', count: myBids.length },
+    { key: 'saved', label: 'Saved', icon: 'heart-outline', count: myWatchlist.length },
+    { key: 'my_items', label: 'My Items', icon: 'cube-outline', count: myListings.length },
+  ];
 
   return (
     <View className="flex-1 bg-[#09090E]">
       <StatusBar barStyle="light-content" />
       <SafeAreaView className="flex-1">
         
-        {/* Header Profile Section */}
-        <View className="px-6 pt-6 pb-6 border-b border-white/10">
-          <View className="flex-row justify-between items-start">
-            <View className="flex-1 pr-4">
-              <Text className="text-3xl font-black text-white tracking-widest uppercase mb-1">My Profile</Text>
-              <Text className="text-cyan-500 font-bold text-[10px] tracking-[3px] uppercase mb-4">{user?.email}</Text>
-              
-              <View className="space-y-2">
-                <View className="flex-row items-center">
-                  <Ionicons name="person-circle-outline" size={16} color="#9ca3af" className="mr-2" />
-                  <Text className="text-gray-300 text-xs">{fullName}</Text>
+        {/* Header */}
+        <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
+          <Text className="text-xl font-black text-white tracking-wide">My Profile</Text>
+          <View className="flex-row items-center space-x-2">
+            <TouchableOpacity 
+              onPress={handleEditProfile} 
+              className="bg-cyan-500/10 border border-cyan-500/20 px-4 py-2 rounded-full flex-row items-center"
+            >
+              <Ionicons name="create-outline" size={14} color="#22d3ee" />
+              <Text className="text-cyan-400 font-bold text-[11px] ml-1.5">Edit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* Profile Card */}
+          <View className="mx-6 mt-4 rounded-3xl overflow-hidden border border-white/[0.06]">
+            {/* Gradient Header Background */}
+            <LinearGradient
+              colors={['rgba(6, 182, 212, 0.15)', 'rgba(99, 102, 241, 0.1)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ padding: 24, paddingBottom: 20 }}
+            >
+              <View className="flex-row items-center">
+                {/* Avatar */}
+                <View className="w-20 h-20 rounded-full items-center justify-center mr-4 border-2 border-cyan-400/30" 
+                  style={{ backgroundColor: 'rgba(6, 182, 212, 0.12)' }}>
+                  <Text className="text-cyan-400 text-2xl font-black">{initials}</Text>
                 </View>
-                {user?.user_metadata?.phone_number && (
+
+                <View className="flex-1">
+                  <Text className="text-white text-xl font-black mb-1">{fullName}</Text>
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="mail-outline" size={13} color="#6b7280" />
+                    <Text className="text-gray-400 text-xs ml-1.5" numberOfLines={1}>{user?.email}</Text>
+                  </View>
                   <View className="flex-row items-center">
-                    <Ionicons name="call-outline" size={16} color="#9ca3af" className="mr-2" />
+                    <Ionicons name="calendar-outline" size={13} color="#6b7280" />
+                    <Text className="text-gray-500 text-[11px] ml-1.5">Member since {memberSince}</Text>
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+
+            {/* User Details Section */}
+            <View className="px-5 pb-5">
+              {/* Bio */}
+              {user?.user_metadata?.bio ? (
+                <View className="mb-4 bg-white/[0.03] rounded-xl p-3.5 border border-white/[0.04]">
+                  <Text className="text-gray-300 text-[13px] leading-5">{user.user_metadata.bio}</Text>
+                </View>
+              ) : null}
+
+              {/* Info Grid */}
+              <View className="flex-row flex-wrap">
+                {user?.user_metadata?.phone_number && (
+                  <View className="flex-row items-center mr-5 mb-3">
+                    <View className="w-7 h-7 rounded-full bg-emerald-500/10 items-center justify-center mr-2">
+                      <Ionicons name="call-outline" size={13} color="#34d399" />
+                    </View>
                     <Text className="text-gray-300 text-xs">{user.user_metadata.phone_number}</Text>
                   </View>
                 )}
                 {user?.user_metadata?.age && (
-                  <View className="flex-row items-center">
-                    <Ionicons name="calendar-outline" size={16} color="#9ca3af" className="mr-2" />
-                    <Text className="text-gray-300 text-xs">Age: {user.user_metadata.age}</Text>
+                  <View className="flex-row items-center mr-5 mb-3">
+                    <View className="w-7 h-7 rounded-full bg-violet-500/10 items-center justify-center mr-2">
+                      <Ionicons name="person-outline" size={13} color="#a78bfa" />
+                    </View>
+                    <Text className="text-gray-300 text-xs">{user.user_metadata.age} years old</Text>
+                  </View>
+                )}
+                {user?.user_metadata?.city && (
+                  <View className="flex-row items-center mr-5 mb-3">
+                    <View className="w-7 h-7 rounded-full bg-amber-500/10 items-center justify-center mr-2">
+                      <Ionicons name="location-outline" size={13} color="#fbbf24" />
+                    </View>
+                    <Text className="text-gray-300 text-xs">{user.user_metadata.city}</Text>
                   </View>
                 )}
               </View>
             </View>
-            <View className="items-end space-y-3">
-              <TouchableOpacity onPress={handleEditProfile} className="bg-cyan-500/10 border border-cyan-500/30 px-3 py-2 rounded-lg w-20 items-center">
-                <Text className="text-cyan-400 font-bold text-[10px] uppercase tracking-wider">Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignOutConfirm} className="bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg w-20 items-center">
-                <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Log Out</Text>
-              </TouchableOpacity>
+          </View>
+
+          {/* Stats Row */}
+          <View className="flex-row mx-6 mt-4 space-x-3">
+            <View className="flex-1 bg-[#13131a] border border-white/[0.06] rounded-2xl p-4 items-center">
+              <Text className="text-2xl font-black text-cyan-400">{stats.totalBids}</Text>
+              <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mt-1">Total Bids</Text>
+            </View>
+            <View className="flex-1 bg-[#13131a] border border-white/[0.06] rounded-2xl p-4 items-center">
+              <Text className="text-2xl font-black text-violet-400">{myListings.length}</Text>
+              <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mt-1">My Items</Text>
+            </View>
+            <View className="flex-1 bg-[#13131a] border border-white/[0.06] rounded-2xl p-4 items-center">
+              <Text className="text-2xl font-black text-emerald-400">{myWatchlist.length}</Text>
+              <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mt-1">Saved</Text>
             </View>
           </View>
 
-          <View className="flex-row mt-6 bg-black/40 p-4 rounded-2xl border border-white/5">
-            <View className="flex-1 items-center border-r border-white/10">
-              <Text className="text-xl font-black text-cyan-400">{stats.totalBids}</Text>
-              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Offers</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <Text className="text-xl font-black text-purple-400">{myListings.length}</Text>
-              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Items</Text>
-            </View>
+          {/* Tab Selector */}
+          <View className="flex-row mx-6 mt-6 bg-[#0e0e14] rounded-2xl p-1.5 border border-white/[0.04]">
+            {tabs.map((tab) => (
+              <TouchableOpacity 
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key as any)}
+                className={`flex-1 py-3 rounded-xl flex-row items-center justify-center ${
+                  activeTab === tab.key ? 'bg-cyan-500/15' : ''
+                }`}
+              >
+                <Ionicons 
+                  name={tab.icon as any} 
+                  size={14} 
+                  color={activeTab === tab.key ? '#22d3ee' : '#6b7280'} 
+                />
+                <Text className={`text-[11px] font-bold ml-1.5 ${
+                  activeTab === tab.key ? 'text-cyan-400' : 'text-gray-500'
+                }`}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </View>
 
-        {/* 3-Way Dashboard Tabs */}
-        <View className="flex-row px-6 mt-6 mb-4 space-x-2">
-          {['bids', 'watchlist', 'listings'].map((tab) => (
-            <TouchableOpacity 
-              key={tab}
-              onPress={() => setActiveTab(tab as any)}
-              className={`flex-1 py-3 rounded-xl border ${activeTab === tab ? 'bg-cyan-500/20 border-cyan-400/50' : 'bg-transparent border-transparent'}`}
-            >
-              <Text className={`text-center font-bold tracking-widest uppercase text-[10px] ${activeTab === tab ? 'text-cyan-400' : 'text-gray-500'}`}>
-                {tab === 'bids' ? 'Offers' : tab === 'watchlist' ? 'Saved' : 'Items'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* List Content */}
-        <View className="flex-1 px-6">
-          {loading ? (
-            <ActivityIndicator color="#06b6d4" className="mt-10" />
-          ) : (
-            <FlatList
-              data={getActiveData()}
-              keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
-              renderItem={({ item }) => renderAuctionItem({ item, type: activeTab })}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 100 }}
-              ListEmptyComponent={
-                <View className="mt-10 items-center bg-white/5 border border-white/10 p-6 rounded-3xl">
-                  <Ionicons name={activeTab === 'watchlist' ? 'bookmark-outline' : 'folder-open-outline'} size={40} color="#4b5563" className="mb-4" />
-                  <Text className="text-gray-500 font-bold uppercase tracking-widest text-center text-xs">
-                    {activeTab === 'bids' && 'You haven\'t made any offers yet.'}
-                    {activeTab === 'watchlist' && 'Your saved list is empty.'}
-                    {activeTab === 'listings' && 'You have no active items.'}
-                  </Text>
+          {/* List Content */}
+          <View className="px-6 mt-4">
+            {loading ? (
+              <ActivityIndicator color="#06b6d4" className="mt-10" />
+            ) : getActiveData().length === 0 ? (
+              <View className="mt-6 items-center bg-[#13131a] border border-white/[0.06] p-8 rounded-3xl">
+                <View className="w-14 h-14 rounded-full bg-white/[0.04] items-center justify-center mb-4">
+                  <Ionicons 
+                    name={activeTab === 'saved' ? 'heart-outline' : activeTab === 'bids' ? 'pricetag-outline' : 'cube-outline'} 
+                    size={24} 
+                    color="#4b5563" 
+                  />
                 </View>
-              }
-            />
-          )}
-        </View>
+                <Text className="text-gray-500 font-semibold text-sm text-center mb-1">
+                  {activeTab === 'bids' && 'No bids yet'}
+                  {activeTab === 'saved' && 'Nothing saved yet'}
+                  {activeTab === 'my_items' && 'No items listed yet'}
+                </Text>
+                <Text className="text-gray-600 text-xs text-center">
+                  {activeTab === 'bids' && 'Start bidding on items you love!'}
+                  {activeTab === 'saved' && 'Save items to keep track of them.'}
+                  {activeTab === 'my_items' && 'List your first item for sale!'}
+                </Text>
+              </View>
+            ) : (
+              getActiveData().map((item, index) => (
+                <View key={item.id ? item.id.toString() : index.toString()}>
+                  {renderItem({ item, type: activeTab })}
+                </View>
+              ))
+            )}
+          </View>
 
+          {/* Log Out Button */}
+          <TouchableOpacity 
+            onPress={handleLogOut} 
+            className="mx-6 mt-8 flex-row items-center justify-center py-4 rounded-2xl border border-red-500/15 bg-red-500/[0.06]"
+          >
+            <Ionicons name="log-out-outline" size={18} color="#f87171" />
+            <Text className="text-red-400 font-bold text-sm ml-2">Log Out</Text>
+          </TouchableOpacity>
+
+        </ScrollView>
       </SafeAreaView>
     </View>
   );

@@ -39,14 +39,16 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// FIX 1: Custom Dark Theme to prevent white flashes during screen transitions
-const NexusDarkTheme = {
+// Custom Dark Theme
+const AppDarkTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
@@ -62,63 +64,72 @@ function MainTabs() {
     <Tab.Navigator 
       screenOptions={({ route }) => ({ 
         headerShown: false,
-        tabBarShowLabel: false,
-        tabBarHideOnKeyboard: true, // Keeps it out of the way when typing
+        tabBarShowLabel: true,
+        tabBarHideOnKeyboard: true,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          marginTop: -2,
+          marginBottom: Platform.OS === 'ios' ? 0 : 6,
+        },
         tabBarStyle: {
           position: 'absolute',
-          bottom: Platform.OS === 'ios' ? 24 : 16,
-          left: 20,
-          right: 20,
-          backgroundColor: '#050508', 
+          bottom: Platform.OS === 'ios' ? 24 : 12,
+          left: 16,
+          right: 16,
+          backgroundColor: '#0a0a12', 
           borderTopWidth: 0,
-          height: 65,
-          borderRadius: 35,
-          borderColor: 'rgba(6, 182, 212, 0.3)',
+          height: Platform.OS === 'ios' ? 72 : 68,
+          borderRadius: 24,
+          borderColor: 'rgba(255, 255, 255, 0.04)',
           borderWidth: 1,
           elevation: 10,
-          shadowColor: '#06b6d4',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.4,
+          shadowRadius: 16,
+          paddingTop: 6,
         },
-        tabBarActiveTintColor: '#06b6d4',
+        tabBarActiveTintColor: '#22d3ee',
         tabBarInactiveTintColor: '#4b5563',
       })}
     >
       <Tab.Screen 
-        name="Marketplace" 
+        name="Home" 
         component={HomeScreen} 
         options={{
+          tabBarLabel: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'flash' : 'flash-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
           )
         }}
       />
 
-      {/* FIX 2: Central Floating Action Button disguised as a Tab */}
+      {/* Central Floating Action Button as a Tab */}
       <Tab.Screen 
         name="CreateSpacer" 
         component={DummyScreen}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            e.preventDefault(); // Stop normal tab routing
-            navigation.navigate('CreateAuction'); // Trigger the Modal instead!
+            e.preventDefault();
+            navigation.navigate('CreateAuction');
           },
         })}
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <View style={{
-              width: 56, 
-              height: 56, 
-              borderRadius: 28, 
-              backgroundColor: 'rgba(6, 182, 212, 0.15)',
-              borderWidth: 1, 
-              borderColor: '#06b6d4', 
+              width: 52, 
+              height: 52, 
+              borderRadius: 26, 
+              backgroundColor: 'rgba(6, 182, 212, 0.12)',
+              borderWidth: 1.5, 
+              borderColor: 'rgba(34, 211, 238, 0.3)', 
               justifyContent: 'center', 
               alignItems: 'center',
-              marginBottom: 20, // Pushes it up out of the pill
+              marginBottom: 18,
             }}>
-              <Ionicons name="add" size={32} color="#06b6d4" />
+              <Ionicons name="add" size={28} color="#22d3ee" />
             </View>
           ),
         }}
@@ -128,8 +139,9 @@ function MainTabs() {
         name="Profile" 
         component={ProfileScreen} 
         options={{
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           )
         }}
       />
@@ -155,7 +167,7 @@ export default function RootNavigator() {
             .channel('public:auctions_insert')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auctions' }, (payload) => {
                if (payload.new.created_by !== session?.user?.id) {
-                 triggerNotification('New Auction Listing', `${payload.new.title} was just listed for ₹${payload.new.starting_price}!`);
+                 triggerNotification('New Item Listed! 🆕', `"${payload.new.title}" is now up for auction starting at ₹${payload.new.starting_price}!`);
                }
             })
             .subscribe();
@@ -164,7 +176,7 @@ export default function RootNavigator() {
             .channel('public:auctions_update')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions' }, (payload) => {
                if (payload.new.current_price > (payload.old.current_price || 0)) {
-                 triggerNotification('New Bid Placed!', `A new bid of ₹${payload.new.current_price} was placed on ${payload.new.title || 'an item'}!`);
+                 triggerNotification('New Bid! 💰', `Someone bid ₹${payload.new.current_price} on "${payload.new.title || 'an item'}"!`);
                }
             })
             .subscribe();
@@ -177,7 +189,6 @@ export default function RootNavigator() {
 
   if (!isInitialized) {
     return (
-      // FIX 3: Dark Mode Loading Screen
       <View className="flex-1 items-center justify-center bg-[#09090E]">
         <ActivityIndicator size="large" color="#06b6d4" />
       </View>
@@ -185,7 +196,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={NexusDarkTheme}>
+    <NavigationContainer theme={AppDarkTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           // Authenticated App

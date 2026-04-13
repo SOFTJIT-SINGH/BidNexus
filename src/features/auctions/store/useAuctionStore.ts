@@ -4,8 +4,13 @@ import { getAuctions } from '../api/auctionApi';
 interface Auction {
   id: string;
   title: string;
+  description?: string;
   current_price: number;
+  starting_price?: number;
   end_time: string;
+  image_url?: string;
+  category?: string;
+  created_by?: string;
 }
 
 interface AuctionState {
