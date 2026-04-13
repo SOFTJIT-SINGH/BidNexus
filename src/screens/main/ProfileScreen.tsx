@@ -89,17 +89,17 @@ export default function ProfileScreen() {
           <Text className="text-white font-bold mb-1" numberOfLines={1}>{auctionData.title}</Text>
           
           {type === 'bids' ? (
-            <Text className="text-gray-500 text-[10px] tracking-widest uppercase">Placed on {new Date(item.created_at).toLocaleDateString()}</Text>
+            <Text className="text-gray-500 text-[10px] tracking-widest uppercase">Offered on {new Date(item.created_at).toLocaleDateString()}</Text>
           ) : (
             <Text className={`text-[10px] font-bold uppercase tracking-widest ${isEnded ? 'text-red-400' : 'text-green-400'}`}>
-              {isEnded ? 'Auction Ended' : 'Live Auction'}
+              {isEnded ? 'Listing Ended' : 'Live Item'}
             </Text>
           )}
         </View>
 
         <View className="items-end">
           <Text className="text-gray-400 text-[9px] uppercase tracking-widest mb-1">
-            {type === 'bids' ? 'Your Bid' : 'Current Value'}
+            {type === 'bids' ? 'Your Offer' : 'Current Value'}
           </Text>
           <Text className="text-cyan-400 font-black text-lg">
             ${type === 'bids' ? item.amount : auctionData.current_price}
@@ -115,6 +115,12 @@ export default function ProfileScreen() {
     return myListings;
   };
 
+  const handleEditProfile = () => {
+    navigation.navigate('EditProfile');
+  };
+
+  const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() || 'No Name Provided';
+
   return (
     <View className="flex-1 bg-[#09090E]">
       <StatusBar barStyle="light-content" />
@@ -123,23 +129,47 @@ export default function ProfileScreen() {
         {/* Header Profile Section */}
         <View className="px-6 pt-6 pb-6 border-b border-white/10">
           <View className="flex-row justify-between items-start">
-            <View>
-              <Text className="text-3xl font-black text-white tracking-widest uppercase mb-1">Command</Text>
-              <Text className="text-cyan-500 font-bold text-[10px] tracking-[3px] uppercase">{user?.email}</Text>
+            <View className="flex-1 pr-4">
+              <Text className="text-3xl font-black text-white tracking-widest uppercase mb-1">My Profile</Text>
+              <Text className="text-cyan-500 font-bold text-[10px] tracking-[3px] uppercase mb-4">{user?.email}</Text>
+              
+              <View className="space-y-2">
+                <View className="flex-row items-center">
+                  <Ionicons name="person-circle-outline" size={16} color="#9ca3af" className="mr-2" />
+                  <Text className="text-gray-300 text-xs">{fullName}</Text>
+                </View>
+                {user?.user_metadata?.phone_number && (
+                  <View className="flex-row items-center">
+                    <Ionicons name="call-outline" size={16} color="#9ca3af" className="mr-2" />
+                    <Text className="text-gray-300 text-xs">{user.user_metadata.phone_number}</Text>
+                  </View>
+                )}
+                {user?.user_metadata?.age && (
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar-outline" size={16} color="#9ca3af" className="mr-2" />
+                    <Text className="text-gray-300 text-xs">Age: {user.user_metadata.age}</Text>
+                  </View>
+                )}
+              </View>
             </View>
-            <TouchableOpacity onPress={handleSignOutConfirm} className="bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg">
-              <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Log Out</Text>
-            </TouchableOpacity>
+            <View className="items-end space-y-3">
+              <TouchableOpacity onPress={handleEditProfile} className="bg-cyan-500/10 border border-cyan-500/30 px-3 py-2 rounded-lg w-20 items-center">
+                <Text className="text-cyan-400 font-bold text-[10px] uppercase tracking-wider">Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSignOutConfirm} className="bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg w-20 items-center">
+                <Text className="text-red-400 font-bold text-[10px] uppercase tracking-wider">Log Out</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View className="flex-row mt-6 bg-black/40 p-4 rounded-2xl border border-white/5">
             <View className="flex-1 items-center border-r border-white/10">
               <Text className="text-xl font-black text-cyan-400">{stats.totalBids}</Text>
-              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Total Bids</Text>
+              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Offers</Text>
             </View>
             <View className="flex-1 items-center">
               <Text className="text-xl font-black text-purple-400">{myListings.length}</Text>
-              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Listings</Text>
+              <Text className="text-gray-500 text-[9px] font-black uppercase tracking-widest mt-1">Items</Text>
             </View>
           </View>
         </View>
@@ -153,7 +183,7 @@ export default function ProfileScreen() {
               className={`flex-1 py-3 rounded-xl border ${activeTab === tab ? 'bg-cyan-500/20 border-cyan-400/50' : 'bg-transparent border-transparent'}`}
             >
               <Text className={`text-center font-bold tracking-widest uppercase text-[10px] ${activeTab === tab ? 'text-cyan-400' : 'text-gray-500'}`}>
-                {tab === 'bids' ? 'Bids' : tab === 'watchlist' ? 'Saved' : 'Listed'}
+                {tab === 'bids' ? 'Offers' : tab === 'watchlist' ? 'Saved' : 'Items'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -174,9 +204,9 @@ export default function ProfileScreen() {
                 <View className="mt-10 items-center bg-white/5 border border-white/10 p-6 rounded-3xl">
                   <Ionicons name={activeTab === 'watchlist' ? 'bookmark-outline' : 'folder-open-outline'} size={40} color="#4b5563" className="mb-4" />
                   <Text className="text-gray-500 font-bold uppercase tracking-widest text-center text-xs">
-                    {activeTab === 'bids' && 'You haven\'t placed any bids yet.'}
-                    {activeTab === 'watchlist' && 'Your watchlist is empty.'}
-                    {activeTab === 'listings' && 'You have no active listings.'}
+                    {activeTab === 'bids' && 'You haven\'t made any offers yet.'}
+                    {activeTab === 'watchlist' && 'Your saved list is empty.'}
+                    {activeTab === 'listings' && 'You have no active items.'}
                   </Text>
                 </View>
               }

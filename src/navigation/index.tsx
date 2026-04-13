@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View, Platform } from 'react-native';
+import { ActivityIndicator, View, Platform, Alert } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
+import { supabase } from '@/src/services/supabase/supabase';
 
 // Screens
 import LoginScreen from '@/src/screens/auth/LoginScreen';
@@ -14,7 +16,31 @@ import HomeScreen from '@/src/screens/main/HomeScreen';
 import ProfileScreen from '@/src/screens/main/ProfileScreen';
 import AuctionDetailScreen from '@/src/screens/main/AuctionDetailScreen';
 import CreateAuctionScreen from '@/src/screens/main/CreateAuctionScreen';
+import EditProfileScreen from '@/src/screens/main/EditProfileScreen';
 import ResetPasswordScreen from '@/src/screens/auth/ResetPasswordScreen';
+
+// Helper for Expo Go compatibility
+const triggerNotification = async (title: string, body: string) => {
+  try {
+    if (Platform.OS !== 'web') {
+      await Notifications.scheduleNotificationAsync({
+        content: { title, body },
+        trigger: null,
+      });
+    }
+  } catch (err) {
+    // Fallback for Expo Go which restricts push notification libs
+    Alert.alert(`🔔 ${title}`, body);
+  }
+};
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,7 +86,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen 
-        name="Auctions" 
+        name="Marketplace" 
         component={HomeScreen} 
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -119,6 +145,36 @@ export default function RootNavigator() {
     return () => cleanup();
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    
+          // We don't request permissions because Expo Go 53+ blocks native notification permissions
+          // and throws fatal network errors on Android
+
+          const newItemsSub = supabase
+            .channel('public:auctions_insert')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auctions' }, (payload) => {
+               if (payload.new.created_by !== session?.user?.id) {
+                 triggerNotification('New Auction Listing', `${payload.new.title} was just listed for ₹${payload.new.starting_price}!`);
+               }
+            })
+            .subscribe();
+
+          const bidsSub = supabase
+            .channel('public:auctions_update')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions' }, (payload) => {
+               if (payload.new.current_price > (payload.old.current_price || 0)) {
+                 triggerNotification('New Bid Placed!', `A new bid of ₹${payload.new.current_price} was placed on ${payload.new.title || 'an item'}!`);
+               }
+            })
+            .subscribe();
+
+    return () => {
+      supabase.removeChannel(newItemsSub);
+      supabase.removeChannel(bidsSub);
+    };
+  }, [session]);
+
   if (!isInitialized) {
     return (
       // FIX 3: Dark Mode Loading Screen
@@ -137,6 +193,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="AuctionDetail" component={AuctionDetailScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreateAuction" component={CreateAuctionScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ presentation: 'modal' }} />
           </Stack.Group>
         ) : (
           // Unauthenticated Flow

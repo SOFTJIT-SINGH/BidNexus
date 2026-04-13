@@ -10,7 +10,6 @@ import { supabase } from '@/src/services/supabase/supabase';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 
-const DURATIONS = [{ label: '1 Day', days: 1 }, { label: '3 Days', days: 3 }, { label: '7 Days', days: 7 }];
 const CATEGORIES = ['Tech', 'Vehicles', 'High Value', 'Other']; // NEW: Category Tags
 
 export default function CreateAuctionScreen() {
@@ -21,7 +20,7 @@ export default function CreateAuctionScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startingPrice, setStartingPrice] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState(3);
+  const [durationDays, setDurationDays] = useState('3');
   const [selectedCategory, setSelectedCategory] = useState('Tech'); // NEW: State
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,7 +60,9 @@ export default function CreateAuctionScreen() {
       }
 
       const endTime = new Date();
-      endTime.setDate(endTime.getDate() + selectedDuration);
+      const days = parseInt(durationDays, 10);
+      if (isNaN(days) || days <= 0) return Alert.alert('Invalid Duration', 'Please enter a valid number of days.');
+      endTime.setDate(endTime.getDate() + days);
       
       const { error } = await supabase.from('auctions').insert({
         title, description, starting_price: price, current_price: price, 
@@ -85,8 +86,8 @@ export default function CreateAuctionScreen() {
             
             <View className="flex-row justify-between items-center mb-8">
               <View>
-                <Text className="text-3xl font-black text-white tracking-wider">CREATE</Text>
-                <Text className="text-cyan-400 text-xs tracking-widest uppercase font-bold">New Auction Listing</Text>
+                <Text className="text-3xl font-black text-white tracking-wider">SELL</Text>
+                <Text className="text-cyan-400 text-xs tracking-widest uppercase font-bold">New Item Listing</Text>
               </View>
               <TouchableOpacity onPress={handleGoBack} className="bg-white/5 p-2 rounded-full border border-white/10">
                 <Text className="text-gray-400 text-xs px-2 font-bold uppercase">Cancel</Text>
@@ -127,20 +128,14 @@ export default function CreateAuctionScreen() {
                   <TextInput className="w-full bg-black/40 px-4 py-4 rounded-xl text-cyan-400 font-bold border border-white/5" keyboardType="numeric" value={startingPrice} onChangeText={setStartingPrice} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[10px] font-black text-gray-500 mb-2 tracking-[2px] uppercase">Duration</Text>
-                  <View className="flex-row justify-between bg-black/40 p-1 rounded-xl border border-white/5">
-                    {DURATIONS.map((d) => (
-                      <TouchableOpacity key={d.days} onPress={() => setSelectedDuration(d.days)} className={`flex-1 py-3 rounded-lg ${selectedDuration === d.days ? 'bg-cyan-500' : ''}`}>
-                        <Text className={`text-center text-[10px] font-black ${selectedDuration === d.days ? 'text-black' : 'text-gray-400'}`}>{d.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <Text className="text-[10px] font-black text-gray-500 mb-2 tracking-[2px] uppercase">Duration (Days)</Text>
+                  <TextInput className="w-full bg-black/40 px-4 py-4 rounded-xl text-cyan-400 font-bold border border-white/5" keyboardType="numeric" value={durationDays} onChangeText={setDurationDays} />
                 </View>
               </View>
 
               <TouchableOpacity className="w-full rounded-xl mt-4" onPress={handleCreateAuction} disabled={isSubmitting}>
                 <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="py-4 items-center">
-                  {isSubmitting ? <ActivityIndicator color="#ffffff" /> : <Text className="text-white font-black tracking-widest uppercase">Publish</Text>}
+                  {isSubmitting ? <ActivityIndicator color="#ffffff" /> : <Text className="text-white font-black tracking-widest uppercase">List Item</Text>}
                 </LinearGradient>
               </TouchableOpacity>
               

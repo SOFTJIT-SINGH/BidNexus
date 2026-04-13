@@ -22,17 +22,44 @@ export default function AuctionDetailScreen() {
   // NEW: Edit Mode State
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editDescription, setEditDescription] = useState('');
+  
+  // NEW: Watchlist State
+  const [isWatchlisted, setIsWatchlisted] = useState(false);
 
   const { timeLeft, isEnded } = useAuctionTimer(auction?.end_time);
   const isOwner = user?.id === auction?.created_by; // Check if user is the seller
 
   useEffect(() => {
     fetchAuctionDetails();
+    checkIfWatchlisted();
     const channel = supabase.channel(`auction-${auctionId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions', filter: `id=eq.${auctionId}` }, 
       (payload) => setAuction(payload.new)).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [auctionId]);
+
+  const checkIfWatchlisted = async () => {
+    try {
+      const { data } = await supabase.from('watchlist').select('*').eq('auction_id', auctionId).eq('user_id', user?.id).maybeSingle();
+      setIsWatchlisted(!!data);
+    } catch (e) {
+      console.log('Error checking watchlist', e);
+    }
+  };
+
+  const handleToggleWatchlist = async () => {
+    try {
+      if (isWatchlisted) {
+        await supabase.from('watchlist').delete().match({ auction_id: auctionId, user_id: user?.id });
+        setIsWatchlisted(false);
+      } else {
+        await supabase.from('watchlist').insert({ auction_id: auctionId, user_id: user?.id });
+        setIsWatchlisted(true);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not update watchlist.');
+    }
+  };
 
   const fetchAuctionDetails = async () => {
     try {
@@ -70,13 +97,13 @@ export default function AuctionDetailScreen() {
 
   const handlePlaceBid = async () => {
     const amount = parseFloat(bidAmount);
-    if (isNaN(amount) || amount <= auction.current_price) return Alert.alert('Invalid Bid', 'Must be higher than current bid.');
+    if (isNaN(amount) || amount <= auction.current_price) return Alert.alert('Invalid Offer', 'Must be higher than current offer.');
     setIsBidding(true);
     try {
       const { error } = await supabase.rpc('place_bid', { p_auction_id: auctionId, p_user_id: user?.id, p_amount: amount });
       if (error) throw error;
       setBidAmount('');
-    } catch (error: any) { Alert.alert('Bid Failed', error.message); } 
+    } catch (error: any) { Alert.alert('Offer Failed', error.message); } 
     finally { setIsBidding(false); }
   };
 
@@ -96,7 +123,7 @@ export default function AuctionDetailScreen() {
       <SafeAreaView className="flex-1">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : "height"} className="flex-1">
           
-          <View className="px-6 py-4 flex-row items-center justify-between z-10">
+          <View className="px-6 py-4 flex-row items-center justify-between z-10 w-full">
             <TouchableOpacity onPress={() => navigation.goBack()} className="w-10 h-10 bg-black/50 rounded-full items-center justify-center border border-white/10">
               <Ionicons name="chevron-back" size={24} color="#06b6d4" />
             </TouchableOpacity>
@@ -106,6 +133,9 @@ export default function AuctionDetailScreen() {
                 <Text className="text-red-500 text-xs font-bold tracking-widest uppercase">Live</Text>
               </View>
             )}
+            <TouchableOpacity onPress={handleToggleWatchlist} className="w-10 h-10 bg-black/50 rounded-full items-center justify-center border border-white/10">
+              <Ionicons name={isWatchlisted ? "bookmark" : "bookmark-outline"} size={20} color="#06b6d4" />
+            </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerClassName="p-6 pb-32 pt-32">
@@ -123,7 +153,7 @@ export default function AuctionDetailScreen() {
 
               <View className="bg-black/60 p-5 rounded-2xl border border-white/5 flex-row justify-between items-center">
                 <View>
-                  <Text className="text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest">Current Bid</Text>
+                  <Text className="text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest">Current Offer</Text>
                   <Text className="text-3xl font-black text-cyan-400">${Number(auction.current_price).toLocaleString()}</Text>
                 </View>
                 <View className="items-end">
@@ -136,8 +166,8 @@ export default function AuctionDetailScreen() {
             {/* CONDITIONAL UI: Owner Panel vs Bidder Panel */}
             {isOwner ? (
                <View className="overflow-hidden rounded-3xl border border-purple-500/30 bg-purple-900/10 p-6">
-                 <Text className="text-purple-400 font-black tracking-widest uppercase text-sm mb-4">Seller Controls</Text>
-                 <Text className="text-gray-400 text-xs mb-4">You cannot bid on your own item. Manage your listing below.</Text>
+                 <Text className="text-purple-400 font-black tracking-widest uppercase text-sm mb-4">Seller Options</Text>
+                 <Text className="text-gray-400 text-xs mb-4">You cannot make offers on your own item. Manage your listing below.</Text>
                  
                  <TouchableOpacity onPress={() => setIsEditModalVisible(true)} className="bg-white/5 border border-white/10 py-4 rounded-xl items-center mb-3">
                    <Text className="text-white font-bold uppercase text-xs tracking-widest">Edit Description</Text>
@@ -149,14 +179,14 @@ export default function AuctionDetailScreen() {
                </View>
             ) : !isEnded ? (
               <View className="overflow-hidden rounded-3xl border border-white/10 bg-[#09090E]/80 p-6">
-                <Text className="text-sm font-bold text-white mb-4 tracking-widest uppercase">Place Your Bid</Text>
+                <Text className="text-sm font-bold text-white mb-4 tracking-widest uppercase">Make an Offer</Text>
                 <View className="flex-row items-center mb-6 bg-black/50 border border-white/10 rounded-2xl px-4 py-2">
                   <Text className="text-2xl font-black text-cyan-600 mr-2">₹</Text>
                   <TextInput className="flex-1 py-3 text-2xl font-black text-white" keyboardType="numeric" value={bidAmount} onChangeText={setBidAmount} editable={!isBidding} />
                 </View>
                 <TouchableOpacity className="w-full overflow-hidden rounded-xl" onPress={handlePlaceBid} disabled={isBidding || !bidAmount}>
                   <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="py-4 items-center">
-                    {isBidding ? <ActivityIndicator color="#ffffff" /> : <Text className="text-white font-black tracking-widest uppercase text-sm">Submit Bid</Text>}
+                    {isBidding ? <ActivityIndicator color="#ffffff" /> : <Text className="text-white font-black tracking-widest uppercase text-sm">Submit Offer</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

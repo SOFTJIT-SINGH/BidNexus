@@ -57,9 +57,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     navigation.navigate('AuctionDetail', { auctionId: id });
   };
 
-  // --- NEW: Sign Out Confirmation Warning ---
   const handleSignOutConfirm = () => {
-    Alert.alert('Terminate Session', 'Are you sure you want to securely log out of BidNexus?', [
+    Alert.alert('Log Out', 'Are you sure you want to log out of BidNexus?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Log Out',
@@ -145,7 +144,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View className="flex-row items-end justify-between rounded-2xl border border-white/5 bg-black/40 p-4">
               <View>
                 <Text className="mb-1 text-xs font-bold uppercase tracking-widest text-gray-500">
-                  Current Bid
+                  Current Offer
                 </Text>
                 <Text className="text-2xl font-black text-cyan-400">
                   ₹{Number(item.current_price).toLocaleString()}
@@ -172,10 +171,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       <SafeAreaView className="flex-1">
         <View className="flex-row items-center border-b border-cyan-500/20 bg-cyan-900/20 px-6 py-2">
           <Text className="mr-3 text-[10px] font-black uppercase tracking-[3px] text-cyan-400">
-            Update
+            Info
           </Text>
           <Text className="text-xs tracking-wider text-cyan-100/70" numberOfLines={1}>
-            Welcome to BidNexus. Live auctions are updating in real-time.
+            Welcome to BidNexus. Items are updating in real-time.
           </Text>
         </View>
 
@@ -185,9 +184,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               <Ionicons name="menu" size={32} color="#22d3ee" />
             </TouchableOpacity>
             <View>
-              <Text className="text-2xl font-black tracking-wider text-white">AUCTIONS</Text>
+              <Text className="text-2xl font-black tracking-wider text-white">MARKETPLACE</Text>
               <Text className="mt-1 text-xs uppercase tracking-widest text-gray-500">
-                Live Market
+                Browse Items
               </Text>
             </View>
           </View>
@@ -267,8 +266,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 </View>
                 <Text className="text-center text-sm font-bold uppercase tracking-widest text-gray-500">
                   {activeCategory === 'All Items'
-                    ? 'No active auctions found.'
-                    : `No ${activeCategory} auctions found.`}
+                    ? 'No items found.'
+                    : `No ${activeCategory} items found.`}
                 </Text>
               </View>
             }
@@ -305,7 +304,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 <View className="flex-1">
                   {/* Displays their actual First Name */}
                   <Text className="text-white text-lg font-black tracking-widest uppercase">
-                    {user?.user_metadata?.first_name || 'Operator'}
+                    {user?.user_metadata?.first_name || 'User'}
                   </Text>
                   <Text className="text-gray-400 text-[10px] tracking-[1px] uppercase" numberOfLines={1}>
                     {user?.email}
@@ -322,7 +321,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   className="flex-row items-center rounded-xl border border-white/5 bg-white/5 px-2 py-4">
                   <Ionicons name="person-outline" size={20} color="#22d3ee" className="mr-4" />
                   <Text className="text-sm font-bold uppercase tracking-widest text-white">
-                    Dashboard
+                    My Profile
                   </Text>
                 </TouchableOpacity>
 
@@ -334,7 +333,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   className="flex-row items-center rounded-xl px-2 py-4">
                   <Ionicons name="bookmark-outline" size={20} color="#9ca3af" className="mr-4" />
                   <Text className="text-sm font-bold uppercase tracking-widest text-gray-400">
-                    Watchlist
+                    Saved Items
                   </Text>
                 </TouchableOpacity>
 
@@ -389,13 +388,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 </TouchableOpacity> */}
               {/* </View> */}
 
-              {/* FIX: Wired the button to the new handleSignOutConfirm function */}
               <TouchableOpacity
                 onPress={handleSignOutConfirm}
                 className="flex-row items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 py-4">
                 <Ionicons name="log-out-outline" size={20} color="#ef4444" className="mr-2" />
                 <Text className="text-sm font-black uppercase tracking-widest text-red-500">
-                  Terminate Session
+                  Log Out
                 </Text>
               </TouchableOpacity>
             </View>
