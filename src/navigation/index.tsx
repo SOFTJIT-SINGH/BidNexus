@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View, Platform, Alert } from 'react-native';
+import { ActivityIndicator, View, Platform, Alert, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -62,50 +62,47 @@ const DummyScreen = () => null;
 function MainTabs() {
   return (
     <Tab.Navigator 
-      screenOptions={({ route }) => ({ 
+      screenOptions={{ 
         headerShown: false,
-        tabBarShowLabel: true,
         tabBarHideOnKeyboard: true,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginTop: -2,
-          marginBottom: Platform.OS === 'ios' ? 0 : 6,
-        },
         tabBarStyle: {
           position: 'absolute',
-          bottom: Platform.OS === 'ios' ? 24 : 12,
-          left: 16,
-          right: 16,
-          backgroundColor: '#0a0a12', 
-          borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 72 : 68,
-          borderRadius: 24,
-          borderColor: 'rgba(255, 255, 255, 0.04)',
-          borderWidth: 1,
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.4,
-          shadowRadius: 16,
-          paddingTop: 6,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#0c0c14',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255, 255, 255, 0.04)',
+          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: '#22d3ee',
-        tabBarInactiveTintColor: '#4b5563',
-      })}
+        tabBarInactiveTintColor: '#52525b',
+        tabBarShowLabel: false,
+      }}
     >
       <Tab.Screen 
         name="Home" 
         component={HomeScreen} 
         options={{
-          tabBarLabel: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+            <View className="items-center">
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+              <Text style={{ color, fontSize: 10, fontWeight: focused ? '700' : '500', marginTop: 4 }}>
+                Home
+              </Text>
+              {focused && (
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#22d3ee', marginTop: 3 }} />
+              )}
+            </View>
           )
         }}
       />
 
-      {/* Central Floating Action Button as a Tab */}
+      {/* Central Sell Button */}
       <Tab.Screen 
         name="CreateSpacer" 
         component={DummyScreen}
@@ -117,19 +114,22 @@ function MainTabs() {
         })}
         options={{
           tabBarLabel: () => null,
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: () => (
             <View style={{
-              width: 52, 
-              height: 52, 
-              borderRadius: 26, 
-              backgroundColor: 'rgba(6, 182, 212, 0.12)',
-              borderWidth: 1.5, 
-              borderColor: 'rgba(34, 211, 238, 0.3)', 
+              width: 56, 
+              height: 56, 
+              borderRadius: 16, 
               justifyContent: 'center', 
               alignItems: 'center',
-              marginBottom: 18,
+              marginBottom: Platform.OS === 'ios' ? 16 : 20,
+              backgroundColor: '#06b6d4',
+              shadowColor: '#06b6d4',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 12,
+              elevation: 8,
             }}>
-              <Ionicons name="add" size={28} color="#22d3ee" />
+              <Ionicons name="add" size={30} color="white" />
             </View>
           ),
         }}
@@ -139,9 +139,16 @@ function MainTabs() {
         name="Profile" 
         component={ProfileScreen} 
         options={{
-          tabBarLabel: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+            <View className="items-center">
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+              <Text style={{ color, fontSize: 10, fontWeight: focused ? '700' : '500', marginTop: 4 }}>
+                Profile
+              </Text>
+              {focused && (
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#22d3ee', marginTop: 3 }} />
+              )}
+            </View>
           )
         }}
       />

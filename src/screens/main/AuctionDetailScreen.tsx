@@ -4,15 +4,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '@/src/services/supabase/supabase';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
+import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 import { useAuctionTimer } from '@/src/features/auctions/hooks/useAuctionTimer';
+
+const CATEGORIES = ['Tech', 'Vehicles', 'Fashion', 'Home', 'Other'];
 
 export default function AuctionDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation();
   const { auctionId } = route.params;
   const { user } = useAuthStore();
+  const { fetchAuctions } = useAuctionStore();
 
   const [auction, setAuction] = useState<any>(null);
   const [bidAmount, setBidAmount] = useState('');
@@ -21,7 +28,12 @@ export default function AuctionDetailScreen() {
   
   // Edit Mode State
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editStartingPrice, setEditStartingPrice] = useState('');
+  const [editImageUri, setEditImageUri] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   // Save/Bookmark State
   const [isSaved, setIsSaved] = useState(false);
@@ -32,6 +44,7 @@ export default function AuctionDetailScreen() {
 
   const { timeLeft, isEnded } = useAuctionTimer(auction?.end_time);
   const isOwner = user?.id === auction?.created_by;
+  const hasBids = auction && Number(auction.current_price) > Number(auction.starting_price);
 
   useEffect(() => {
     fetchAuctionDetails();
@@ -41,7 +54,7 @@ export default function AuctionDetailScreen() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions', filter: `id=eq.${auctionId}` }, 
       (payload) => {
         setAuction(payload.new);
-        fetchBidHistory(); // Refresh bid history on update
+        fetchBidHistory();
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [auctionId]);
@@ -88,29 +101,93 @@ export default function AuctionDetailScreen() {
       const { data, error } = await supabase.from('auctions').select('*').eq('id', auctionId).single();
       if (error) throw error;
       setAuction(data);
-      setEditDescription(data.description);
     } catch (error) {
       Alert.alert('Error', 'Could not load this item.');
       navigation.goBack();
     } finally { setIsLoading(false); }
   };
 
-  // Owner Controls
-  const handleUpdateDescription = async () => {
+  // --- OWNER: Open Edit Modal with current values ---
+  const openEditModal = () => {
+    setEditTitle(auction.title || '');
+    setEditDescription(auction.description || '');
+    setEditCategory(auction.category || 'Other');
+    setEditStartingPrice(String(auction.starting_price || auction.current_price || ''));
+    setEditImageUri(null); // null means "keep current image"
+    setIsEditModalVisible(true);
+  };
+
+  const handleEditImageSelection = () => {
+    Alert.alert("Change Photo", "Choose a new photo for your item", [
+      { text: "📷 Take a Photo", onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) return Alert.alert("Permission Needed", "Please allow camera access.");
+          const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.7 });
+          if (!res.canceled) setEditImageUri(res.assets[0].uri);
+      }},
+      { text: "🖼️ Choose from Gallery", onPress: async () => {
+          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.7 });
+          if (!res.canceled) setEditImageUri(res.assets[0].uri);
+      }},
+      { text: "Cancel", style: "cancel" }
+    ]);
+  };
+
+  const handleSaveEdits = async () => {
+    if (!editTitle.trim()) {
+      return Alert.alert('Missing Title', 'Your item needs a name.');
+    }
+
+    setIsUpdating(true);
     try {
-      const { error } = await supabase.from('auctions').update({ description: editDescription }).eq('id', auctionId);
+      let newImageUrl = auction.image_url; // Keep existing by default
+
+      // Upload new image if one was selected
+      if (editImageUri) {
+        const base64 = await FileSystem.readAsStringAsync(editImageUri, { encoding: FileSystem.EncodingType.Base64 });
+        const fileName = `${user?.id}_${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from('auction-images').upload(fileName, decode(base64), { contentType: 'image/jpeg' });
+        if (uploadError) throw new Error('Failed to upload new image');
+        newImageUrl = supabase.storage.from('auction-images').getPublicUrl(fileName).data.publicUrl;
+      }
+
+      // Build update object
+      const updates: any = {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        category: editCategory,
+        image_url: newImageUrl,
+      };
+
+      // Only allow price change if no bids have been placed yet
+      if (!hasBids) {
+        const newPrice = parseFloat(editStartingPrice);
+        if (!isNaN(newPrice) && newPrice > 0) {
+          updates.starting_price = newPrice;
+          updates.current_price = newPrice;
+        }
+      }
+
+      const { error } = await supabase.from('auctions').update(updates).eq('id', auctionId);
       if (error) throw error;
-      setAuction({ ...auction, description: editDescription });
+
+      setAuction({ ...auction, ...updates });
       setIsEditModalVisible(false);
-      Alert.alert('Updated!', 'Your item description has been saved.');
-    } catch (e: any) { Alert.alert('Error', e.message); }
+      await fetchAuctions(); // Refresh the home list too
+      Alert.alert('Updated! ✅', 'Your item has been updated.');
+    } catch (e: any) {
+      Alert.alert('Update Failed', e.message);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleDeleteItem = () => {
-    Alert.alert("Delete Item", "This will permanently remove your item. Are you sure?", [
+    Alert.alert("Delete Item", "This will permanently remove your item and all its bids. Are you sure?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
           await supabase.from('auctions').delete().eq('id', auctionId);
+          await fetchAuctions();
           navigation.goBack();
       }}
     ]);
@@ -185,9 +262,9 @@ export default function AuctionDetailScreen() {
                 )}
               </View>
               
-              {auction.description && (
+              {auction.description ? (
                 <Text className="text-gray-400 text-sm mb-6 leading-relaxed">{auction.description}</Text>
-              )}
+              ) : null}
 
               {/* Price & Timer */}
               <View className="bg-black/40 p-5 rounded-2xl border border-white/[0.04]">
@@ -204,6 +281,13 @@ export default function AuctionDetailScreen() {
                 {auction.starting_price && (
                   <View className="mt-3 pt-3 border-t border-white/[0.04] flex-row items-center">
                     <Text className="text-gray-600 text-[11px]">Started at ₹{Number(auction.starting_price).toLocaleString()}</Text>
+                    {hasBids && (
+                      <View className="ml-2 bg-emerald-500/10 px-2 py-0.5 rounded">
+                        <Text className="text-emerald-400 text-[10px] font-bold">
+                          +{Math.round(((auction.current_price - auction.starting_price) / auction.starting_price) * 100)}%
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -264,16 +348,26 @@ export default function AuctionDetailScreen() {
                    <View className="w-8 h-8 rounded-full bg-violet-500/15 items-center justify-center mr-3">
                      <Ionicons name="settings-outline" size={14} color="#a78bfa" />
                    </View>
-                   <Text className="text-violet-400 font-bold text-sm">Your Item</Text>
+                   <View className="flex-1">
+                     <Text className="text-violet-400 font-bold text-sm">Your Item</Text>
+                     <Text className="text-gray-500 text-[11px]">You can edit all details of your listing</Text>
+                   </View>
                  </View>
-                 <Text className="text-gray-400 text-xs mb-4">You can't bid on your own item. Manage it below.</Text>
                  
-                 <TouchableOpacity onPress={() => setIsEditModalVisible(true)} className="bg-white/[0.04] border border-white/[0.06] py-3.5 rounded-xl items-center mb-2.5 flex-row justify-center">
-                   <Ionicons name="create-outline" size={16} color="#d1d5db" />
-                   <Text className="text-gray-300 font-semibold text-sm ml-2">Edit Description</Text>
+                 <TouchableOpacity 
+                   onPress={openEditModal} 
+                   className="bg-violet-500/10 border border-violet-500/20 py-3.5 rounded-xl items-center mb-2.5 flex-row justify-center"
+                   activeOpacity={0.7}
+                 >
+                   <Ionicons name="create-outline" size={16} color="#a78bfa" />
+                   <Text className="text-violet-300 font-semibold text-sm ml-2">Edit Item Details</Text>
                  </TouchableOpacity>
                  
-                 <TouchableOpacity onPress={handleDeleteItem} className="bg-red-500/[0.08] border border-red-500/15 py-3.5 rounded-xl items-center flex-row justify-center">
+                 <TouchableOpacity 
+                   onPress={handleDeleteItem} 
+                   className="bg-red-500/[0.08] border border-red-500/15 py-3.5 rounded-xl items-center flex-row justify-center"
+                   activeOpacity={0.7}
+                 >
                    <Ionicons name="trash-outline" size={16} color="#f87171" />
                    <Text className="text-red-400 font-semibold text-sm ml-2">Delete Item</Text>
                  </TouchableOpacity>
@@ -339,32 +433,161 @@ export default function AuctionDetailScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Edit Description Modal */}
-      <Modal visible={isEditModalVisible} transparent animationType="slide">
-        <View className="flex-1 justify-end bg-black/80">
-          <View className="bg-[#12121a] p-6 rounded-t-3xl border-t border-white/[0.06]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-white font-bold text-lg">Edit Description</Text>
-              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
-                <Ionicons name="close" size={22} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            <TextInput 
-              className="bg-black/40 text-white p-4 rounded-xl border border-white/[0.06] mb-6 h-32 text-sm"
-              multiline textAlignVertical="top"
-              value={editDescription} onChangeText={setEditDescription}
-              placeholder="Describe your item..."
-              placeholderTextColor="#3f3f46"
-            />
-            <View className="flex-row space-x-3">
-              <TouchableOpacity onPress={() => setIsEditModalVisible(false)} className="flex-1 py-4 border border-white/[0.06] rounded-xl items-center bg-white/[0.03]">
-                <Text className="text-gray-400 font-semibold text-sm">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleUpdateDescription} className="flex-1 py-4 rounded-xl items-center" style={{ backgroundColor: '#06b6d4' }}>
-                <Text className="text-white font-bold text-sm">Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      {/* FULL EDIT MODAL */}
+      <Modal visible={isEditModalVisible} transparent={false} animationType="slide">
+        <View className="flex-1 bg-[#09090E]">
+          <SafeAreaView className="flex-1">
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+              
+              {/* Modal Header */}
+              <View className="flex-row items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+                <TouchableOpacity onPress={() => setIsEditModalVisible(false)} className="flex-row items-center">
+                  <Ionicons name="close" size={22} color="#9ca3af" />
+                  <Text className="text-gray-400 font-semibold text-sm ml-1">Cancel</Text>
+                </TouchableOpacity>
+                <Text className="text-white font-bold text-base">Edit Item</Text>
+                <TouchableOpacity 
+                  onPress={handleSaveEdits} 
+                  disabled={isUpdating}
+                  className="bg-cyan-500/15 border border-cyan-500/20 px-4 py-2 rounded-full"
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator color="#22d3ee" size="small" />
+                  ) : (
+                    <Text className="text-cyan-400 font-bold text-[12px]">Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                
+                {/* Image Section */}
+                <TouchableOpacity 
+                  onPress={handleEditImageSelection} 
+                  className="w-full h-48 rounded-2xl overflow-hidden mb-6 border border-white/[0.06]"
+                  activeOpacity={0.7}
+                >
+                  {(editImageUri || auction.image_url) ? (
+                    <View className="w-full h-full">
+                      <Image 
+                        source={{ uri: editImageUri || auction.image_url }} 
+                        style={{ width: '100%', height: '100%' }} 
+                        resizeMode="cover" 
+                      />
+                      <View className="absolute inset-0 bg-black/30 items-center justify-center">
+                        <View className="bg-black/60 px-4 py-2 rounded-full flex-row items-center border border-white/20">
+                          <Ionicons name="camera-outline" size={16} color="white" />
+                          <Text className="text-white text-xs font-semibold ml-1.5">Change Photo</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <View className="w-full h-full bg-white/[0.02] items-center justify-center">
+                      <Ionicons name="camera-outline" size={32} color="#6b7280" />
+                      <Text className="text-gray-500 text-xs mt-2">Add a Photo</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Title */}
+                <View className="mb-5">
+                  <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Item Name</Text>
+                  <TextInput 
+                    className="w-full bg-[#13131a] border border-white/[0.06] px-4 py-3.5 rounded-xl text-white text-[15px]"
+                    value={editTitle}
+                    onChangeText={setEditTitle}
+                    placeholder="What are you selling?"
+                    placeholderTextColor="#3f3f46"
+                  />
+                </View>
+
+                {/* Category */}
+                <View className="mb-5">
+                  <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Category</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {CATEGORIES.map(cat => (
+                      <TouchableOpacity 
+                        key={cat} 
+                        onPress={() => setEditCategory(cat)} 
+                        className={`mr-2 px-4 py-2.5 rounded-xl border ${
+                          editCategory === cat 
+                            ? 'bg-cyan-500/12 border-cyan-400/25' 
+                            : 'bg-[#13131a] border-white/[0.06]'
+                        }`}
+                      >
+                        <Text className={`text-xs font-semibold ${editCategory === cat ? 'text-cyan-400' : 'text-gray-500'}`}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Description */}
+                <View className="mb-5">
+                  <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Description</Text>
+                  <TextInput 
+                    className="w-full bg-[#13131a] border border-white/[0.06] px-4 py-3.5 rounded-xl text-white text-sm min-h-[120px]"
+                    value={editDescription}
+                    onChangeText={setEditDescription}
+                    placeholder="Describe the item, condition, etc."
+                    placeholderTextColor="#3f3f46"
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                {/* Starting Price */}
+                <View className="mb-6">
+                  <View className="flex-row items-center mb-2 ml-1">
+                    <Text className="text-gray-400 text-xs font-semibold">Starting Price</Text>
+                    {hasBids && (
+                      <View className="bg-amber-500/10 px-2 py-0.5 rounded ml-2">
+                        <Text className="text-amber-400 text-[9px] font-bold">Locked — Bids exist</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View className={`flex-row items-center bg-[#13131a] border border-white/[0.06] rounded-xl px-4 ${hasBids ? 'opacity-40' : ''}`}>
+                    <Text className="text-cyan-500 font-bold text-lg mr-1">₹</Text>
+                    <TextInput 
+                      className="flex-1 py-3.5 text-cyan-400 font-bold text-[15px]"
+                      value={editStartingPrice}
+                      onChangeText={setEditStartingPrice}
+                      keyboardType="numeric"
+                      editable={!hasBids}
+                      placeholder="0"
+                      placeholderTextColor="#3f3f46"
+                    />
+                  </View>
+                  {hasBids && (
+                    <Text className="text-gray-600 text-[11px] mt-1.5 ml-1">
+                      Price can't be changed after someone places a bid.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Save Button (Bottom) */}
+                <TouchableOpacity 
+                  className="w-full rounded-xl overflow-hidden" 
+                  onPress={handleSaveEdits} 
+                  disabled={isUpdating}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="py-4 items-center flex-row justify-center">
+                    {isUpdating ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle-outline" size={18} color="white" />
+                        <Text className="text-white font-black text-sm ml-2">Save Changes</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
         </View>
       </Modal>
 
