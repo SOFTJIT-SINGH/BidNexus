@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
+
 import { supabase } from '@/src/services/supabase/supabase';
 
 // Screens
@@ -21,28 +21,9 @@ import ResetPasswordScreen from '@/src/screens/auth/ResetPasswordScreen';
 
 // Helper for Expo Go compatibility
 const triggerNotification = async (title: string, body: string) => {
-  try {
-    if (Platform.OS !== 'web') {
-      await Notifications.scheduleNotificationAsync({
-        content: { title, body },
-        trigger: null,
-      });
-    }
-  } catch (err) {
-    // Fallback for Expo Go which restricts push notification libs
-    Alert.alert(`🔔 ${title}`, body);
-  }
+  // Since Expo Go blocks native push notifications, we fall back to a built-in alert!
+  Alert.alert(`🔔 ${title}`, body);
 };
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();

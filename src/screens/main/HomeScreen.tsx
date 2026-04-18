@@ -121,6 +121,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     const isEnded = timeRemaining === 'Ended';
     const isEndingSoon = !isEnded && (new Date(item.end_time).getTime() - new Date().getTime()) / (1000 * 60 * 60) <= 24;
 
+    // Extract unique bidder names
+    const bidderNames = item.bids 
+      ? Array.from(new Set(item.bids.map((b: any) => b.profiles?.first_name).filter(Boolean)))
+      : [];
+    const biddersText = bidderNames.length > 0
+      ? `Bids by: ${bidderNames.slice(0, 3).join(', ')}${bidderNames.length > 3 ? '...' : ''}`
+      : 'No bids yet';
+
     return (
       <TouchableOpacity
         className="mb-4"
@@ -160,7 +168,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               )}
             </View>
 
-            <Text className="mb-3 text-lg font-bold text-white">{item.title}</Text>
+            <Text className="mb-1 text-lg font-bold text-white">{item.title}</Text>
+            
+            {/* Added Seller Profile Display */}
+            <View className="flex-row items-center mb-3">
+               <Ionicons name="person-circle-outline" size={14} color="#6b7280" />
+               <Text className="text-gray-500 text-xs ml-1">
+                 Listed by {item.seller && item.seller.first_name ? item.seller.first_name : 'Anonymous'}
+               </Text>
+            </View>
 
             {!item.image_url && (
               <View className="flex-row items-center mb-2">
@@ -170,6 +186,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 </Text>
               </View>
             )}
+
+            <View className="flex-row items-center mb-3 space-x-1 border-b border-white/[0.04] pb-3">
+              <Ionicons name="people-outline" size={14} color="#9ca3af" />
+              <Text className="text-[11px] text-gray-400 font-medium ml-1">
+                {biddersText}
+              </Text>
+            </View>
 
             <View className="flex-row items-end justify-between rounded-xl border border-white/[0.04] bg-black/30 p-3.5">
               <View>
