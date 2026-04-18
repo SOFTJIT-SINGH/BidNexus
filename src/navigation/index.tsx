@@ -18,6 +18,7 @@ import AuctionDetailScreen from '@/src/screens/main/AuctionDetailScreen';
 import CreateAuctionScreen from '@/src/screens/main/CreateAuctionScreen';
 import EditProfileScreen from '@/src/screens/main/EditProfileScreen';
 import ResetPasswordScreen from '@/src/screens/auth/ResetPasswordScreen';
+import NotificationsScreen from '@/src/screens/main/NotificationsScreen';
 
 // Helper for Expo Go compatibility
 const triggerNotification = async (title: string, body: string) => {
@@ -193,6 +194,7 @@ export default function RootNavigator() {
             <Stack.Screen name="AuctionDetail" component={AuctionDetailScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreateAuction" component={CreateAuctionScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
           </Stack.Group>
         ) : (
           // Unauthenticated Flow

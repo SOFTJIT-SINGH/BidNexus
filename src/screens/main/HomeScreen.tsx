@@ -234,17 +234,26 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             </View>
           </View>
 
-          <TouchableOpacity
-            onPress={() => setShowFilters(!showFilters)}
-            className={`h-10 w-10 items-center justify-center rounded-full border ${
-              showFilters ? 'border-cyan-400/30 bg-cyan-500/10' : 'border-white/[0.06] bg-white/[0.04]'
-            }`}>
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color={showFilters ? '#22d3ee' : '#9ca3af'}
-            />
-          </TouchableOpacity>
+          <View className="flex-row space-x-3">
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Notifications')}
+              className="h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.04]">
+              <Ionicons name="notifications-outline" size={18} color="#9ca3af" />
+              {/* Optional: Add a tiny red dot absolute positioned here for indicator */}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowFilters(!showFilters)}
+              className={`h-10 w-10 items-center justify-center rounded-full border ${
+                showFilters ? 'border-cyan-400/30 bg-cyan-500/10' : 'border-white/[0.06] bg-white/[0.04]'
+              }`}>
+              <Ionicons
+                name="options-outline"
+                size={18}
+                color={showFilters ? '#22d3ee' : '#9ca3af'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Category Filters */}
