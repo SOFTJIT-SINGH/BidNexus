@@ -11,7 +11,15 @@ import { supabase } from '@/src/services/supabase/supabase';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 
-const CATEGORIES = ['Tech', 'Vehicles', 'Fashion', 'Home', 'Other'];
+const CATEGORIES = ['Mobiles'];
+const SUCCESS_TIPS = [
+  "Use high-quality images from multiple angles.",
+  "Be honest about the condition (scratches, battery health, etc.).",
+  "Set a competitive starting price to attract more bidders.",
+  "Describe if any accessories like charger or box are included.",
+];
+const BRANDS = ['Apple', 'Samsung', 'Google', 'OnePlus', 'Xiaomi', 'Other'];
+const CONDITIONS = ['New', 'Like New', 'Used', 'Cracked'];
 const DURATIONS = [
   { label: '1 Day', value: '1' },
   { label: '3 Days', value: '3' },
@@ -28,7 +36,9 @@ export default function CreateAuctionScreen() {
   const [description, setDescription] = useState('');
   const [startingPrice, setStartingPrice] = useState('');
   const [durationDays, setDurationDays] = useState('3');
-  const [selectedCategory, setSelectedCategory] = useState('Tech');
+  const [selectedCategory, setSelectedCategory] = useState('Mobiles');
+  const [selectedBrand, setSelectedBrand] = useState('Apple');
+  const [selectedCondition, setSelectedCondition] = useState('Like New');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -74,7 +84,7 @@ export default function CreateAuctionScreen() {
       
       const { error } = await supabase.from('auctions').insert({
         title: title.trim(), 
-        description: description.trim(), 
+        description: `Brand: ${selectedBrand}\nCondition: ${selectedCondition}\n\n${description.trim()}`, 
         starting_price: price, 
         current_price: price, 
         end_time: endTime.toISOString(), 
@@ -171,6 +181,50 @@ export default function CreateAuctionScreen() {
                 </ScrollView>
               </View>
 
+              {/* Brand Selector */}
+              <View className="mb-5">
+                <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Brand</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {BRANDS.map(brand => (
+                    <TouchableOpacity 
+                      key={brand} 
+                      onPress={() => setSelectedBrand(brand)} 
+                      className={`mr-2 px-4 py-2.5 rounded-xl border ${
+                        selectedBrand === brand 
+                          ? 'bg-cyan-500/12 border-cyan-400/25' 
+                          : 'bg-black/20 border-white/[0.04]'
+                      }`}
+                    >
+                      <Text className={`text-xs font-semibold ${selectedBrand === brand ? 'text-cyan-400' : 'text-gray-500'}`}>
+                        {brand}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Condition Selector */}
+              <View className="mb-5">
+                <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Condition</Text>
+                <View className="flex-row flex-wrap">
+                  {CONDITIONS.map(cond => (
+                    <TouchableOpacity 
+                      key={cond} 
+                      onPress={() => setSelectedCondition(cond)} 
+                      className={`mr-2 mb-2 px-4 py-2.5 rounded-xl border ${
+                        selectedCondition === cond 
+                          ? 'bg-cyan-500/12 border-cyan-400/25' 
+                          : 'bg-black/20 border-white/[0.04]'
+                      }`}
+                    >
+                      <Text className={`text-xs font-semibold ${selectedCondition === cond ? 'text-cyan-400' : 'text-gray-500'}`}>
+                        {cond}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Description */}
               <View className="mb-5">
                 <Text className="text-gray-400 text-xs font-semibold mb-2 ml-1">Description</Text>
@@ -239,6 +293,20 @@ export default function CreateAuctionScreen() {
                 </LinearGradient>
               </TouchableOpacity>
               
+              {/* Success Tips Section */}
+              <View className="mt-6 p-5 rounded-2xl bg-cyan-500/5 border border-cyan-500/10">
+                <View className="flex-row items-center mb-3">
+                  <Ionicons name="bulb-outline" size={18} color="#22d3ee" />
+                  <Text className="text-cyan-400 font-bold ml-2">Tips for a Successful Auction</Text>
+                </View>
+                {SUCCESS_TIPS.map((tip, idx) => (
+                  <View key={idx} className="flex-row mb-2">
+                    <Text className="text-cyan-400 mr-2">•</Text>
+                    <Text className="text-gray-400 text-xs flex-1">{tip}</Text>
+                  </View>
+                ))}
+              </View>
+
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

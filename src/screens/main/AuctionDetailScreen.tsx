@@ -12,7 +12,7 @@ import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 import { useAuctionTimer } from '@/src/features/auctions/hooks/useAuctionTimer';
 
-const CATEGORIES = ['Tech', 'Vehicles', 'Fashion', 'Home', 'Other'];
+const CATEGORIES = ['Mobiles'];
 
 export default function AuctionDetailScreen() {
   const route = useRoute<any>();
@@ -72,7 +72,7 @@ export default function AuctionDetailScreen() {
     try {
       const { data } = await supabase
         .from('bids')
-        .select('amount, created_at, user_id')
+        .select('amount, created_at, user_id, profiles(first_name, last_name)')
         .eq('auction_id', auctionId)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -80,6 +80,62 @@ export default function AuctionDetailScreen() {
     } catch (e) {
       console.log('Error fetching bid history', e);
     }
+  };
+
+  const handleReschedule = async () => {
+    Alert.alert(
+      "Reschedule Auction",
+      "Do you want to reschedule this auction for another 3 days?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reschedule", onPress: async () => {
+          setIsUpdating(true);
+          try {
+            const newEndTime = new Date();
+            newEndTime.setDate(newEndTime.getDate() + 3);
+            const { error } = await supabase
+              .from('auctions')
+              .update({ end_time: newEndTime.toISOString(), current_price: auction.starting_price })
+              .eq('id', auctionId);
+            
+            if (error) throw error;
+            Alert.alert("Success ✅", "Auction has been rescheduled.");
+            fetchAuctionDetails();
+          } catch (e: any) {
+            Alert.alert("Error", e.message);
+          } finally {
+            setIsUpdating(false);
+          }
+        }}
+      ]
+    );
+  };
+
+  const handleMakeWinner = (bid: any) => {
+    Alert.alert("Declare Winner", `Accept ₹${bid.amount} and make ${bid.profiles?.first_name} the winner? This ends the auction immediately.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Accept & End", onPress: async () => {
+        setIsUpdating(true);
+        try {
+          const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const { error } = await supabase.from('auctions').update({
+            end_time: new Date().toISOString(),
+            winner_id: bid.user_id,
+            claim_code: code,
+            current_price: bid.amount,
+            status: 'sold'
+          }).eq('id', auctionId);
+          
+          if (error) throw error;
+          Alert.alert("Winner Declared! 🎉", `${bid.profiles?.first_name} has won the item.`);
+          fetchAuctionDetails();
+        } catch (e: any) {
+          Alert.alert("Error", e.message);
+        } finally {
+          setIsUpdating(false);
+        }
+      }}
+    ]);
   };
 
   const handleToggleSave = async () => {
@@ -98,7 +154,11 @@ export default function AuctionDetailScreen() {
 
   const fetchAuctionDetails = async () => {
     try {
-      const { data, error } = await supabase.from('auctions').select('*').eq('id', auctionId).single();
+      const { data, error } = await supabase
+        .from('auctions')
+        .select('*, seller:profiles!created_by(first_name, last_name)')
+        .eq('id', auctionId)
+        .single();
       if (error) throw error;
       setAuction(data);
     } catch (error) {
@@ -270,17 +330,18 @@ export default function AuctionDetailScreen() {
               <View className="bg-black/40 p-5 rounded-2xl border border-white/[0.04]">
                 <View className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Current Price</Text>
+                    <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Current Price</Text>
                     <Text className="text-3xl font-black text-cyan-400">₹{Number(auction.current_price).toLocaleString()}</Text>
                   </View>
                   <View className="items-end">
-                    <Text className="text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Time Left</Text>
+                    <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Time Left</Text>
                     <Text className={`text-base font-bold ${isEnded ? 'text-red-400' : 'text-white'}`}>{timeLeft}</Text>
                   </View>
                 </View>
                 {auction.starting_price && (
                   <View className="mt-3 pt-3 border-t border-white/[0.04] flex-row items-center">
-                    <Text className="text-gray-600 text-[11px]">Started at ₹{Number(auction.starting_price).toLocaleString()}</Text>
+                    <Text className="text-gray-400 text-[11px]">Started at ₹{Number(auction.starting_price).toLocaleString()}</Text>
+                    <Text className="text-gray-500 text-[11px] ml-1.5">by {auction.seller?.first_name || 'Seller'}</Text>
                     {hasBids && (
                       <View className="ml-2 bg-emerald-500/10 px-2 py-0.5 rounded">
                         <Text className="text-emerald-400 text-[10px] font-bold">
@@ -315,25 +376,41 @@ export default function AuctionDetailScreen() {
                 {showBidHistory && (
                   <View className="px-4 pb-4">
                     {bidHistory.map((bid, index) => (
-                      <View key={index} className="flex-row items-center justify-between py-2.5 border-t border-white/[0.03]">
-                        <View className="flex-row items-center">
-                          <View className={`w-6 h-6 rounded-full items-center justify-center mr-2.5 ${index === 0 ? 'bg-cyan-500/15' : 'bg-white/[0.04]'}`}>
-                            <Text className={`text-[10px] font-black ${index === 0 ? 'text-cyan-400' : 'text-gray-500'}`}>
-                              {index + 1}
-                            </Text>
-                          </View>
-                          <Text className={`text-sm font-bold ${index === 0 ? 'text-cyan-400' : 'text-gray-300'}`}>
-                            ₹{Number(bid.amount).toLocaleString()}
-                          </Text>
-                          {bid.user_id === user?.id && (
-                            <View className="bg-cyan-500/10 px-2 py-0.5 rounded ml-2">
-                              <Text className="text-cyan-400 text-[9px] font-bold">You</Text>
+                      <View key={index} className="flex-col py-2.5 border-t border-white/[0.03]">
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center">
+                            <View className={`w-6 h-6 rounded-full items-center justify-center mr-2.5 ${index === 0 ? 'bg-cyan-500/15' : 'bg-white/[0.04]'}`}>
+                              <Text className={`text-[10px] font-black ${index === 0 ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                {index + 1}
+                              </Text>
                             </View>
-                          )}
+                            <View>
+                              <Text className={`text-sm font-bold ${index === 0 ? 'text-cyan-400' : 'text-gray-300'}`}>
+                                ₹{Number(bid.amount).toLocaleString()}
+                              </Text>
+                              <Text className="text-[10px] text-gray-400">
+                                by {bid.profiles?.first_name || 'Anonymous'}
+                              </Text>
+                            </View>
+                            {bid.user_id === user?.id && (
+                              <View className="bg-cyan-500/10 px-2 py-0.5 rounded ml-2">
+                                <Text className="text-cyan-400 text-[9px] font-bold">You</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text className="text-gray-600 text-[11px]">
+                            {new Date(bid.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </Text>
                         </View>
-                        <Text className="text-gray-600 text-[11px]">
-                          {new Date(bid.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </Text>
+                        {isOwner && !auction.winner_id && (
+                          <TouchableOpacity 
+                            onPress={() => handleMakeWinner(bid)}
+                            className="mt-2.5 bg-emerald-500/10 border border-emerald-500/20 py-2 rounded-xl items-center flex-row justify-center"
+                          >
+                            <Ionicons name="trophy-outline" size={14} color="#34d399" />
+                            <Text className="text-emerald-400 font-bold text-[11px] ml-1.5">Accept as Winner</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     ))}
                   </View>
@@ -362,10 +439,31 @@ export default function AuctionDetailScreen() {
                    <Ionicons name="create-outline" size={16} color="#a78bfa" />
                    <Text className="text-violet-300 font-semibold text-sm ml-2">Edit Item Details</Text>
                  </TouchableOpacity>
+
+                 {isEnded && bidHistory.length === 0 && (
+                   <TouchableOpacity 
+                     onPress={handleReschedule} 
+                     className="bg-emerald-500/10 border border-emerald-500/20 py-3.5 rounded-xl items-center mb-2.5 flex-row justify-center"
+                     activeOpacity={0.7}
+                   >
+                     <Ionicons name="refresh-outline" size={16} color="#34d399" />
+                     <Text className="text-emerald-400 font-semibold text-sm ml-2">Reschedule Auction</Text>
+                   </TouchableOpacity>
+                 )}
+                 
+                 <View className="mt-4 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
+                   <View className="flex-row items-center mb-2">
+                     <Ionicons name="bulb-outline" size={16} color="#22d3ee" />
+                     <Text className="text-cyan-400 font-bold text-xs ml-2">Success Tip</Text>
+                   </View>
+                   <Text className="text-gray-400 text-[11px] leading-4">
+                     Auctions with detailed descriptions and high-quality photos are 3x more likely to receive bids. If you're not getting bids, consider rescheduling with a lower starting price.
+                   </Text>
+                 </View>
                  
                  <TouchableOpacity 
                    onPress={handleDeleteItem} 
-                   className="bg-red-500/[0.08] border border-red-500/15 py-3.5 rounded-xl items-center flex-row justify-center"
+                   className="bg-red-500/[0.08] border border-red-500/15 py-3.5 rounded-xl items-center flex-row justify-center mt-3"
                    activeOpacity={0.7}
                  >
                    <Ionicons name="trash-outline" size={16} color="#f87171" />
@@ -420,12 +518,23 @@ export default function AuctionDetailScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <View className="overflow-hidden rounded-2xl border border-red-500/15 bg-red-500/[0.05] p-5 items-center">
-                <View className="w-12 h-12 rounded-full bg-red-500/10 items-center justify-center mb-3">
-                  <Ionicons name="time-outline" size={24} color="#f87171" />
+              <View className="overflow-hidden rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.05] p-5 items-center">
+                <View className="w-12 h-12 rounded-full bg-emerald-500/10 items-center justify-center mb-3">
+                  <Ionicons name="trophy-outline" size={24} color="#34d399" />
                 </View>
-                <Text className="text-red-400 font-bold text-sm mb-1">This Auction Has Ended</Text>
-                <Text className="text-gray-500 text-xs text-center">Bidding is no longer available for this item.</Text>
+                <Text className="text-emerald-400 font-bold text-sm mb-1">Auction Ended</Text>
+                {bidHistory.length > 0 ? (
+                  <>
+                    <Text className="text-white text-xs text-center font-bold">
+                      Winner: {bidHistory[0].profiles?.first_name} {bidHistory[0].profiles?.last_name}
+                    </Text>
+                    <Text className="text-gray-500 text-[10px] text-center mt-1">
+                      Winning Bid: ₹{Number(bidHistory[0].amount).toLocaleString()}
+                    </Text>
+                  </>
+                ) : (
+                  <Text className="text-gray-500 text-xs text-center">No bids were placed on this item.</Text>
+                )}
               </View>
             )}
 

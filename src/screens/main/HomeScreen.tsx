@@ -17,23 +17,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuctionStore } from '@/src/features/auctions/store/useAuctionStore';
 import { useAuthStore } from '@/src/features/auth/store/useAuthStore';
 
-const CATEGORIES = ['All', 'Ending Soon', 'High Value', 'Tech', 'Vehicles'];
+const CATEGORIES = ['Mobiles'];
+const BRANDS = ['All', 'Apple', 'Samsung', 'Google', 'OnePlus', 'Xiaomi', 'Other'];
+const CONDITIONS = ['All', 'New', 'Like New', 'Used', 'Cracked'];
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const { auctions, isLoading, fetchAuctions } = useAuctionStore();
   const { user, signOut } = useAuthStore();
 
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState('Mobiles');
+  const [activeBrand, setActiveBrand] = useState('All');
+  const [activeCondition, setActiveCondition] = useState('All');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
-
+  const [showFilters, setShowFilters] = useState(false); 
+  const [userRole, setUserRole] = useState('user');
   const slideAnim = useRef(new Animated.Value(-width)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchAuctions();
+    fetchUserRole();
   }, []);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (data) setUserRole(data.role);
+  };
 
   const openMenu = () => {
     setIsSidebarOpen(true);
@@ -73,38 +84,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
-      if (activeCategory === 'All') return true;
-      if (activeCategory === 'Ending Soon') {
-        const hoursLeft =
-          (new Date(auction.end_time).getTime() - new Date().getTime()) / (1000 * 60 * 60);
-        return hoursLeft > 0 && hoursLeft <= 24;
-      }
-      if (activeCategory === 'High Value') {
-        return Number(auction.current_price) >= 500;
-      }
-      if (activeCategory === 'Tech') {
-        const text = `${auction.title} ${auction.description}`.toLowerCase();
-        return (
-          text.includes('tech') ||
-          text.includes('phone') ||
-          text.includes('laptop') ||
-          text.includes('pc') ||
-          text.includes('computer')
-        );
-      }
-      if (activeCategory === 'Vehicles') {
-        const text = `${auction.title} ${auction.description}`.toLowerCase();
-        return (
-          text.includes('car') ||
-          text.includes('vehicle') ||
-          text.includes('bike') ||
-          text.includes('motor') ||
-          text.includes('truck')
-        );
-      }
-      return true;
+      const isMobile = auction.category === 'Mobiles';
+      if (!isMobile) return false;
+
+      const brandMatch = activeBrand === 'All' || auction.description?.includes(`Brand: ${activeBrand}`) || auction.title?.includes(activeBrand);
+      const conditionMatch = activeCondition === 'All' || auction.description?.includes(`Condition: ${activeCondition}`);
+
+      return brandMatch && conditionMatch;
     });
-  }, [auctions, activeCategory]);
+  }, [auctions, activeBrand, activeCondition]);
 
   const getTimeRemaining = (endTime: string) => {
     const diff = new Date(endTime).getTime() - new Date().getTime();
@@ -172,8 +160,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             
             {/* Added Seller Profile Display */}
             <View className="flex-row items-center mb-3">
-               <Ionicons name="person-circle-outline" size={14} color="#6b7280" />
-               <Text className="text-gray-500 text-xs ml-1">
+               <Ionicons name="person-circle-outline" size={14} color="#9ca3af" />
+               <Text className="text-gray-400 text-xs ml-1">
                  Listed by {item.seller && item.seller.first_name ? item.seller.first_name : 'Anonymous'}
                </Text>
             </View>
@@ -203,9 +191,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   ₹{Number(item.current_price).toLocaleString()}
                 </Text>
               </View>
-              <View className="bg-cyan-500/10 border border-cyan-500/20 px-3 py-2 rounded-xl">
-                <Text className="text-cyan-400 text-[11px] font-bold">Place Bid →</Text>
-              </View>
+              {item.created_by === user?.id ? (
+                <View className="bg-white/[0.05] border border-white/[0.1] px-3 py-2 rounded-xl">
+                  <Text className="text-gray-500 text-[11px] font-bold">Your Listing</Text>
+                </View>
+              ) : (
+                <View className="bg-cyan-500/10 border border-cyan-500/20 px-3 py-2 rounded-xl">
+                  <Text className="text-cyan-400 text-[11px] font-bold">Place Bid →</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -256,40 +250,49 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         </View>
 
-        {/* Category Filters */}
+        {/* Mobile Filters */}
         {showFilters && (
-          <View style={{ height: 48, marginBottom: 8 }}>
+          <View className="px-5 mb-4">
+            <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2 ml-1">Brand</Text>
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              data={CATEGORIES}
+              data={BRANDS}
               keyExtractor={(item) => item}
-              contentContainerStyle={{ paddingHorizontal: 20, alignItems: 'center' }}
-              renderItem={({ item: cat }) => (
+              renderItem={({ item: brand }) => (
                 <TouchableOpacity
-                  onPress={() => setActiveCategory(cat)}
-                  style={{
-                    marginRight: 8,
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 20,
-                    borderWidth: 1,
-                    backgroundColor:
-                      activeCategory === cat
-                        ? 'rgba(6, 182, 212, 0.12)'
-                        : 'rgba(255, 255, 255, 0.03)',
-                    borderColor:
-                      activeCategory === cat
-                        ? 'rgba(34, 211, 238, 0.3)'
-                        : 'rgba(255, 255, 255, 0.06)',
-                  }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '600',
-                      color: activeCategory === cat ? '#22d3ee' : '#9ca3af',
-                    }}>
-                    {cat}
+                  onPress={() => setActiveBrand(brand)}
+                  className={`mr-2 px-4 py-2 rounded-full border ${
+                    activeBrand === brand 
+                      ? 'bg-cyan-500/15 border-cyan-400/30' 
+                      : 'bg-white/[0.03] border-white/[0.06]'
+                  }`}
+                >
+                  <Text className={`text-[11px] font-bold ${activeBrand === brand ? 'text-cyan-400' : 'text-gray-400'}`}>
+                    {brand}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              className="mb-3"
+            />
+
+            <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2 ml-1">Condition</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={CONDITIONS}
+              keyExtractor={(item) => item}
+              renderItem={({ item: cond }) => (
+                <TouchableOpacity
+                  onPress={() => setActiveCondition(cond)}
+                  className={`mr-2 px-4 py-2 rounded-full border ${
+                    activeCondition === cond 
+                      ? 'bg-cyan-500/15 border-cyan-400/30' 
+                      : 'bg-white/[0.03] border-white/[0.06]'
+                  }`}
+                >
+                  <Text className={`text-[11px] font-bold ${activeCondition === cond ? 'text-cyan-400' : 'text-gray-400'}`}>
+                    {cond}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -377,6 +380,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   { icon: 'person-outline', label: 'My Profile', onPress: () => { closeMenu(); navigation.navigate('Profile'); } },
                   { icon: 'heart-outline', label: 'Saved Items', onPress: () => { closeMenu(); navigation.navigate('Profile'); } },
                   { icon: 'add-circle-outline', label: 'Sell Something', onPress: () => { closeMenu(); navigation.navigate('CreateAuction'); } },
+                  ...(userRole === 'admin' ? [{ icon: 'shield-checkmark-outline', label: 'Admin Dashboard', onPress: () => { closeMenu(); navigation.navigate('AdminDashboard'); } }] : []),
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.label}

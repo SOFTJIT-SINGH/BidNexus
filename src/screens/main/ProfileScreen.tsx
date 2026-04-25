@@ -13,6 +13,7 @@ export default function ProfileScreen() {
   const isFocused = useIsFocused();
   
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'bids' | 'saved' | 'my_items'>('bids');
   
   const [myBids, setMyBids] = useState<any[]>([]);
@@ -28,33 +29,37 @@ export default function ProfileScreen() {
     try {
       setLoading(true);
       
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
+      setUserProfile(profile);
+      
       const { count } = await supabase.from('bids').select('*', { count: 'exact', head: true }).eq('user_id', user?.id);
       setStats({ totalBids: count || 0, totalWon: 0 });
 
       // 1. Fetch My Bids
       const { data: bidsData } = await supabase
         .from('bids')
-        .select(`amount, created_at, auctions (id, title, current_price, end_time)`)
+        .select(`amount, created_at, auctions (id, title, current_price, end_time, category)`)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
         .limit(20);
-      if (bidsData) setMyBids(bidsData);
+      if (bidsData) setMyBids(bidsData.filter((b: any) => b.auctions?.category === 'Mobiles'));
 
       // 2. Fetch My Listings
       const { data: listingsData } = await supabase
         .from('auctions')
         .select('*')
         .eq('created_by', user?.id)
+        .eq('category', 'Mobiles')
         .order('created_at', { ascending: false });
       if (listingsData) setMyListings(listingsData);
 
       // 3. Fetch Saved Items
       const { data: watchlistData } = await supabase
         .from('watchlist')
-        .select(`id, auctions (id, title, current_price, end_time)`)
+        .select(`id, auctions (id, title, current_price, end_time, category)`)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
-      if (watchlistData) setMyWatchlist(watchlistData);
+      if (watchlistData) setMyWatchlist(watchlistData.filter((w: any) => w.auctions?.category === 'Mobiles'));
 
     } catch (error: any) {
       console.error('Error loading profile data', error.message);
@@ -149,6 +154,15 @@ export default function ProfileScreen() {
         <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
           <Text className="text-xl font-black text-white tracking-wide">My Profile</Text>
           <View className="flex-row items-center space-x-2">
+            {userProfile?.role === 'admin' && (
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('AdminDashboard')} 
+                className="bg-violet-500/10 border border-violet-500/20 px-4 py-2 rounded-full flex-row items-center mr-1"
+              >
+                <Ionicons name="shield-checkmark-outline" size={14} color="#a78bfa" />
+                <Text className="text-violet-400 font-bold text-[11px] ml-1.5">Admin</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               onPress={handleEditProfile} 
               className="bg-cyan-500/10 border border-cyan-500/20 px-4 py-2 rounded-full flex-row items-center"
